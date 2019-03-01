@@ -158,6 +158,7 @@ private:
   static void getLayer(const Nan::FunctionCallbackInfo<v8::Value>& info);
   static void keys(const Nan::FunctionCallbackInfo<v8::Value>& info);
   static void layerVector(const Nan::FunctionCallbackInfo<v8::Value>& info);
+  static void layerKey(const Nan::FunctionCallbackInfo<v8::Value>& info);
 };
 
 /* 
