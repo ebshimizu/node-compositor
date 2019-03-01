@@ -21,7 +21,7 @@ author: Evan Shimizu
 
 using namespace std;
 
-#include "../../../expression_tree/expressionContext.h"
+#include "expression_tree/expressionContext.h"
 
 namespace Comp {
   const string version = "0.1";
