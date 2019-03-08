@@ -3461,6 +3461,14 @@ namespace Comp {
         }
         ctx[layerName].setConditionalBlend(it.value()["conditionalBlend"]["channel"], cbs);
 
+        // precomp order
+        auto pcData = it.value()["precompOrder"];
+        vector<string> ord;
+        for (auto pcit = pcData.begin(); pcit != pcData.end(); ++pcit) {
+          ord.push_back(pcit.value());
+        }
+        ctx[layerName].setPrecompOrder(ord);
+
         // adjustments
         auto adjData = it.value()["adjustments"];
         for (auto ait = adjData.begin(); ait != adjData.end(); ++ait) {
