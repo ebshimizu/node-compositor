@@ -1717,7 +1717,7 @@ void ContextWrapper::layerVector(const Nan::FunctionCallbackInfo<v8::Value>& inf
   CompositorWrapper* comp = Nan::ObjectWrap::Unwrap<CompositorWrapper>(maybe1.ToLocalChecked());
 
   nlohmann::json key;
-  vector<double> layerData = comp->_compositor->contextToVector(c->_context, key);
+  vector<double> layerData = comp->_compositor->contextToVector(c->_context);
 
   v8::Local<v8::Array> vals = Nan::New<v8::Array>();
   for (int i = 0; i < layerData.size(); i++) {

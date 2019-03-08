@@ -3395,7 +3395,8 @@ namespace Comp {
     // add the parameter data to the key
     key = nlohmann::json::array();
 
-    for (auto& l : _layerOrder) {
+    auto order = getFlatLayerOrder();
+    for (auto& l : order) {
       // gather parameter info for all layers
       c[l].addParams(key);
     }
