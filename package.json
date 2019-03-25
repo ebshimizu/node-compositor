@@ -8,5 +8,8 @@
     "nan": "^2.7.0",
     "node-gyp": "^3.6.2"
   },
+  "scripts": {
+    "preinstall": "git submodule update --recursive"
+  },
   "gypfile": true
 }
