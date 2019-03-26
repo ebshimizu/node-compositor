@@ -451,6 +451,9 @@ namespace Comp {
     opacity["adjustmentType"] = AdjustmentType::OPACITY;
     opacity["adjustmentName"] = "opacity";
     opacity["value"] = _opacity;
+    opacity["type"] = "float";
+    opacity["min"] = 0.0f;
+    opacity["max"] = 1.0f;
     paramList.push_back(opacity);
 
     // regular adjustments
@@ -462,6 +465,9 @@ namespace Comp {
         param["adjustmentType"] = a.first;
         param["adjustmentName"] = p.first;
         param["value"] = p.second;
+        param["type"] = "float";
+        param["min"] = 0.0f;
+        param["max"] = 1.0f;
         paramList.push_back(param);
       }
     }
@@ -489,6 +495,9 @@ namespace Comp {
           param["selectiveColor"] = nlohmann::json::object();
           param["selectiveColor"]["channel"] = c;
           param["selectiveColor"]["color"] = p;
+          param["type"] = "float";
+          param["min"] = 0.0f;
+          param["max"] = 1.0f;
           paramList.push_back(param);
         }
       }
