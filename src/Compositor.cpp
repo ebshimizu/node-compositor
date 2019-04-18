@@ -47,6 +47,9 @@ namespace Comp {
     input.close();
 
     _primary = contextFromDarkroom(imageDir + filename);
+
+	// create layer vector key
+	contextToVector(_primary);
   }
 
   Compositor::~Compositor()
