@@ -58,16 +58,22 @@ namespace Comp {
 
   bool Compositor::addLayer(string name, string file)
   {
-    // check for existence in primary context
-    if (_primary.count(name) > 0) {
-      getLogger()->log("Failed to add layer " + name + ". Layer already exists.");
-      return false;
-    }
-
     // load image data
     _imageData[name]["full"] = shared_ptr<Image>(new Image(file));
-    addLayer(name);
     cacheScaled(name);
+
+    // check for existence in primary context
+    if (_primary.count(name) > 0) {
+      // when the layer exists, update the image and layer name
+      _primary[name].setName(name);
+      _primary[name].setImage(_imageData[name]["full"]);
+      getLogger()->log("Updated layer " + name);
+      return false;
+    }
+    else {
+      addLayer(name);
+    }
+
     return true;
   }
 
