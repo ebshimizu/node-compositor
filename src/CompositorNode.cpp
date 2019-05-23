@@ -121,9 +121,9 @@ v8::Local<v8::Value> excGet(v8::Local<v8::Object>& obj, string key)
   if (Nan::HasOwnProperty(obj, Nan::New(key).ToLocalChecked()).ToChecked()) {
     return Nan::Get(obj, Nan::New(key).ToLocalChecked()).ToLocalChecked();
   }
-  else {
-    Nan::ThrowError(string("Object has no key " + key).c_str());
-  }
+
+  Nan::ThrowError(string("Object has no key " + key).c_str());
+  return Nan::New(NULL);
 }
 
 // object bindings
@@ -1912,7 +1912,7 @@ void CompositorWrapper::addBase64Layer(const Nan::FunctionCallbackInfo<v8::Value
   Nan::Utf8String val1(info[1]);
   string base64(*val1);
 
-  Comp::Image img(info[2]->Int32Value(), info[3]->Int32Value(), base64);
+  Comp::Image img(Nan::To<int>(info[2]).ToChecked(), Nan::To<int>(info[3]).ToChecked(), base64);
 
   result = c->_compositor->addLayer(name, img);
 
@@ -2269,7 +2269,7 @@ void CompositorWrapper::reorderLayer(const Nan::FunctionCallbackInfo<v8::Value>&
     Nan::ThrowError("reorderLayer expects (int, int)");
   }
 
-  c->_compositor->reorderLayer(info[0]->Int32Value(), info[1]->Int32Value());
+  c->_compositor->reorderLayer(Nan::To<int>(info[0]).ToChecked(), Nan::To<int>(info[1]).ToChecked());
 }
 
 void CompositorWrapper::startSearch(const Nan::FunctionCallbackInfo<v8::Value>& info)
@@ -2284,7 +2284,7 @@ void CompositorWrapper::startSearch(const Nan::FunctionCallbackInfo<v8::Value>& 
 
   // search mode
   if (info[0]->IsNumber()) {
-    mode = (Comp::SearchMode)info[0]->IntegerValue();
+    mode = (Comp::SearchMode)Nan::To<int>(info[0]).ToChecked();
   }
   else {
     Nan::ThrowError("startSearch must specify a search mode.");
@@ -2294,9 +2294,9 @@ void CompositorWrapper::startSearch(const Nan::FunctionCallbackInfo<v8::Value>& 
   if (info[1]->IsObject()) {
     // convert object to c++ map
     v8::Local<v8::Object> ret = info[1].As<v8::Object>();
-    auto names = ret->GetOwnPropertyNames();
+    auto names = Nan::GetOwnPropertyNames(ret).ToLocalChecked();
     for (unsigned int i = 0; i < names->Length(); i++) {
-      v8::Local<v8::Value> val = ret->Get(Nan::Get(names, i).ToLocalChecked());
+      v8::Local<v8::Value> val = Nan::Get(ret, Nan::Get(names, i).ToLocalChecked()).ToLocalChecked();
       Nan::Utf8String o1(Nan::Get(names, i).ToLocalChecked());
       string prop(*o1);
 
@@ -2306,7 +2306,7 @@ void CompositorWrapper::startSearch(const Nan::FunctionCallbackInfo<v8::Value>& 
 
   // threads
   if (info[2]->IsNumber()) {
-    threads = info[2]->Int32Value();
+    threads = Nan::To<int>(info[2]).ToChecked();
   }
 
   // render size
@@ -2398,9 +2398,9 @@ void CompositorWrapper::setMaskLayer(const Nan::FunctionCallbackInfo<v8::Value>&
     Nan::Utf8String val0(info[0]);
     string name(*val0);
 
-    Comp::ConstraintType type = (Comp::ConstraintType)info[1]->Int32Value();
-    int w = info[2]->Int32Value();
-    int h = info[3]->Int32Value();
+    Comp::ConstraintType type = (Comp::ConstraintType)Nan::To<int>(info[1]).ToChecked();
+    int w = Nan::To<int>(info[2]).ToChecked();
+    int h = Nan::To<int>(info[3]).ToChecked();
 
     Nan::Utf8String val1(info[4]);
     string data(*val1);
@@ -2425,7 +2425,7 @@ void CompositorWrapper::getMaskLayer(const Nan::FunctionCallbackInfo<v8::Value>&
     shared_ptr<Comp::Image> img = c->_compositor->getConstraintData().getRawInput(name);
 
     if (img == nullptr) {
-      info.GetReturnValue().Set(Nan::New(Nan::Null));
+      info.GetReturnValue().Set(Nan::New(Nan::Undefined));
       return;
     }
 
@@ -2482,30 +2482,30 @@ void CompositorWrapper::paramsToCeres(const Nan::FunctionCallbackInfo<v8::Value>
     vector<Comp::Point> pts;
 
     v8::Local<v8::Array> ptsArr = info[1].As<v8::Array>();
-    for (int i = 0; i < ptsArr->Length(); i++) {
+    for (unsigned int i = 0; i < ptsArr->Length(); i++) {
       v8::Local<v8::Object> pt = Nan::Get(ptsArr, i).ToLocalChecked().As<v8::Object>();
-      pts.push_back(Comp::Point(Nan::Get(pt, Nan::New("x").ToLocalChecked()).ToLocalChecked()->NumberValue(),
-        Nan::Get(pt, Nan::New("y").ToLocalChecked()).ToLocalChecked()->NumberValue()));
+      pts.push_back(Comp::Point(Nan::To<double>(Nan::Get(pt, Nan::New("x").ToLocalChecked()).ToLocalChecked()).ToChecked(),
+        Nan::To<double>(Nan::Get(pt, Nan::New("y").ToLocalChecked()).ToLocalChecked()).ToChecked()));
     }
 
     // colors
     vector<Comp::RGBColor> colors;
     v8::Local<v8::Array> colorArr = info[2].As<v8::Array>();
-    for (int i = 0; i < colorArr->Length(); i++) {
+    for (unsigned int i = 0; i < colorArr->Length(); i++) {
       v8::Local<v8::Object> color = Nan::Get(colorArr, i).ToLocalChecked().As<v8::Object>();
 
       Comp::RGBColor c;
-      c._r = Nan::Get(color, Nan::New("r").ToLocalChecked()).ToLocalChecked()->NumberValue();
-      c._g = Nan::Get(color, Nan::New("g").ToLocalChecked()).ToLocalChecked()->NumberValue();
-      c._b = Nan::Get(color, Nan::New("b").ToLocalChecked()).ToLocalChecked()->NumberValue();
+      c._r = (float)Nan::To<double>(Nan::Get(color, Nan::New("r").ToLocalChecked()).ToLocalChecked()).ToChecked();
+      c._g = (float)Nan::To<double>(Nan::Get(color, Nan::New("g").ToLocalChecked()).ToLocalChecked()).ToChecked();
+      c._b = (float)Nan::To<double>(Nan::Get(color, Nan::New("b").ToLocalChecked()).ToLocalChecked()).ToChecked();
       colors.push_back(c);
     }
 
     // weights
     vector<double> weights;
     v8::Local<v8::Array> weightArr = info[3].As<v8::Array>();
-    for (int i = 0; i < weightArr->Length(); i++) {
-      weights.push_back(Nan::Get(weightArr, i).ToLocalChecked()->NumberValue());
+    for (unsigned int i = 0; i < weightArr->Length(); i++) {
+      weights.push_back(Nan::To<double>(Nan::Get(weightArr, i).ToLocalChecked()).ToChecked());
     }
 
     // output
@@ -2575,8 +2575,8 @@ void CompositorWrapper::renderPixel(const Nan::FunctionCallbackInfo<v8::Value>& 
     }
     ContextWrapper* ctx = Nan::ObjectWrap::Unwrap<ContextWrapper>(maybe1.ToLocalChecked());
 
-    int x = info[1]->Int32Value();
-    int y = info[2]->Int32Value();
+    int x = Nan::To<int>(info[1]).ToChecked();
+    int y = Nan::To<int>(info[2]).ToChecked();
 
     Comp::RGBAColor px = c->_compositor->renderPixel(ctx->_context, x, y);
 
@@ -2602,23 +2602,23 @@ void CompositorWrapper::getPixelConstraints(const Nan::FunctionCallbackInfo<v8::
     v8::Local<v8::Object> opt = info[0].As<v8::Object>();
 
     if (Nan::Get(opt, Nan::New("detailedLog").ToLocalChecked()).ToLocalChecked()->IsBoolean()) {
-      c->_compositor->getConstraintData()._verboseDebugMode = Nan::Get(opt, Nan::New("detailedLog").ToLocalChecked()).ToLocalChecked()->BooleanValue();
+      c->_compositor->getConstraintData()._verboseDebugMode = Nan::To<bool>(Nan::Get(opt, Nan::New("detailedLog").ToLocalChecked()).ToLocalChecked()).ToChecked();
     }
 
     if (Nan::Get(opt, Nan::New("unconstrainedDensity").ToLocalChecked()).ToLocalChecked()->IsInt32()) {
-      c->_compositor->getConstraintData()._unconstDensity = Nan::Get(opt, Nan::New("unconstrainedDensity").ToLocalChecked()).ToLocalChecked()->Int32Value();
+      c->_compositor->getConstraintData()._unconstDensity = Nan::To<int>(Nan::Get(opt, Nan::New("unconstrainedDensity").ToLocalChecked()).ToLocalChecked()).ToChecked();
     }
 
     if (Nan::Get(opt, Nan::New("constrainedDensity").ToLocalChecked()).ToLocalChecked()->IsInt32()) {
-      c->_compositor->getConstraintData()._constDensity = Nan::Get(opt, Nan::New("constrainedDensity").ToLocalChecked()).ToLocalChecked()->Int32Value();
+      c->_compositor->getConstraintData()._constDensity = Nan::To<int>(Nan::Get(opt, Nan::New("constrainedDensity").ToLocalChecked()).ToLocalChecked()).ToChecked();
     }
 
     if (Nan::Get(opt, Nan::New("unconstrainedWeight").ToLocalChecked()).ToLocalChecked()->IsNumber()) {
-      c->_compositor->getConstraintData()._totalUnconstrainedWeight = Nan::Get(opt, Nan::New("unconstrainedWeight").ToLocalChecked()).ToLocalChecked()->NumberValue();
+      c->_compositor->getConstraintData()._totalUnconstrainedWeight = Nan::To<double>(Nan::Get(opt, Nan::New("unconstrainedWeight").ToLocalChecked()).ToLocalChecked()).ToChecked();
     }
 
     if (Nan::Get(opt, Nan::New("constrainedWeight").ToLocalChecked()).ToLocalChecked()->IsNumber()) {
-      c->_compositor->getConstraintData()._totalConstrainedWeight = Nan::Get(opt, Nan::New("constrainedWeight").ToLocalChecked()).ToLocalChecked()->NumberValue();
+      c->_compositor->getConstraintData()._totalConstrainedWeight = Nan::To<double>(Nan::Get(opt, Nan::New("constrainedWeight").ToLocalChecked()).ToLocalChecked()).ToChecked();
     }
   }
 
@@ -2688,11 +2688,11 @@ void CompositorWrapper::addSearchGroup(const Nan::FunctionCallbackInfo<v8::Value
 
     // type
     Comp::SearchGroup g;
-    g._type = (Comp::SearchGroupType)(Nan::Get(data, Nan::New("type").ToLocalChecked()).ToLocalChecked()->Int32Value());
+    g._type = (Comp::SearchGroupType)(Nan::To<int>(Nan::Get(data, Nan::New("type").ToLocalChecked()).ToLocalChecked()).ToChecked());
 
     // names
     v8::Local<v8::Array> names = Nan::Get(data, Nan::New("layers").ToLocalChecked()).ToLocalChecked().As<v8::Array>();
-    for (int i = 0; i < names->Length(); i++) {
+    for (unsigned int i = 0; i < names->Length(); i++) {
       Nan::Utf8String val0(Nan::Get(names, Nan::New(i)).ToLocalChecked());
       string name(*val0);
       g._layerNames.push_back(name);
@@ -2723,8 +2723,8 @@ void CompositorWrapper::contextFromVector(const Nan::FunctionCallbackInfo<v8::Va
     vector<double> data;
     v8::Local<v8::Array> v8Data = info[0].As<v8::Array>();
 
-    for (int i = 0; i < v8Data->Length(); i++) {
-      data.push_back(Nan::Get(v8Data, i).ToLocalChecked()->NumberValue());
+    for (unsigned int i = 0; i < v8Data->Length(); i++) {
+      data.push_back(Nan::To<double>(Nan::Get(v8Data, i).ToLocalChecked()).ToChecked());
     }
 
     Comp::Context ctx = c->_compositor->vectorToContext(data);
@@ -2808,10 +2808,10 @@ void CompositorWrapper::importanceInRegion(const Nan::FunctionCallbackInfo<v8::V
     string mode(*i0);
 
     v8::Local<v8::Object> region = info[1].As<v8::Object>();
-    int x = Nan::Get(region, Nan::New("x").ToLocalChecked()).ToLocalChecked()->Int32Value();
-    int y = Nan::Get(region, Nan::New("y").ToLocalChecked()).ToLocalChecked()->Int32Value();
-    int w = Nan::Get(region, Nan::New("w").ToLocalChecked()).ToLocalChecked()->Int32Value();
-    int h = Nan::Get(region, Nan::New("h").ToLocalChecked()).ToLocalChecked()->Int32Value();
+    int x = Nan::To<int>(Nan::Get(region, Nan::New("x").ToLocalChecked()).ToLocalChecked()).ToChecked();
+    int y = Nan::To<int>(Nan::Get(region, Nan::New("y").ToLocalChecked()).ToLocalChecked()).ToChecked();;
+    int w = Nan::To<int>(Nan::Get(region, Nan::New("w").ToLocalChecked()).ToLocalChecked()).ToChecked();;
+    int h = Nan::To<int>(Nan::Get(region, Nan::New("h").ToLocalChecked()).ToLocalChecked()).ToChecked();;
 
     vector<double> scores;
     vector<string> names;
@@ -2877,7 +2877,7 @@ void CompositorWrapper::computeImportanceMap(const Nan::FunctionCallbackInfo<v8:
 
   if (info[0]->IsString() && info[1]->IsNumber() && info[2]->IsObject()) {
     Nan::Utf8String i0(info[0]);
-    Comp::ImportanceMapMode mode = (Comp::ImportanceMapMode)(info[1]->IntegerValue());
+    Comp::ImportanceMapMode mode = (Comp::ImportanceMapMode)(Nan::To<int>(info[1]).ToChecked());
 
     Nan::MaybeLocal<v8::Object> maybe2 = Nan::To<v8::Object>(info[2]);
     if (maybe2.IsEmpty()) {
@@ -2905,7 +2905,7 @@ void CompositorWrapper::computeAllImportanceMaps(const Nan::FunctionCallbackInfo
   nullcheck(c->_compositor, "compositor.computeAllImportanceMaps");
 
   if (info[0]->IsNumber() && info[1]->IsObject()) {
-    Comp::ImportanceMapMode mode = (Comp::ImportanceMapMode)(info[0]->IntegerValue());
+    Comp::ImportanceMapMode mode = (Comp::ImportanceMapMode)(Nan::To<int>(info[0]).ToChecked());
 
     Nan::MaybeLocal<v8::Object> maybe1 = Nan::To<v8::Object>(info[1]);
     if (maybe1.IsEmpty()) {
@@ -2928,7 +2928,7 @@ void CompositorWrapper::getImportanceMap(const Nan::FunctionCallbackInfo<v8::Val
   // existence check
   if (info[0]->IsString() && info[1]->IsNumber()) {
     Nan::Utf8String i0(info[0]);
-    if (c->_compositor->importanceMapExists(string(*i0), (Comp::ImportanceMapMode)(info[1]->IntegerValue()))) {
+    if (c->_compositor->importanceMapExists(string(*i0), (Comp::ImportanceMapMode)(Nan::To<int>(info[1]).ToChecked()))) {
       const int argc = 3;
       v8::Local<v8::Value> argv[argc] = { Nan::New<v8::External>(c->_compositor), info[0], info[1] };
       v8::Local<v8::Function> cons = Nan::New<v8::Function>(ImportanceMapWrapper::importanceMapConstructor);
@@ -2945,7 +2945,7 @@ void CompositorWrapper::deleteImportanceMap(const Nan::FunctionCallbackInfo<v8::
 
   if (info[0]->IsString() && info[1]->IsNumber()) {
     Nan::Utf8String i0(info[0]);
-    c->_compositor->deleteImportanceMap(string(*i0), (Comp::ImportanceMapMode)info[1]->Int32Value());
+    c->_compositor->deleteImportanceMap(string(*i0), (Comp::ImportanceMapMode)Nan::To<int>(info[1]).ToChecked());
   }
   else {
     Nan::ThrowError("compositor.deleteImporanceMap(string, int) argument error");
@@ -2972,7 +2972,7 @@ void CompositorWrapper::deleteImportanceMapType(const Nan::FunctionCallbackInfo<
   nullcheck(c->_compositor, "compositor.deleteImportanceMapType");
 
   if (info[0]->IsNumber()) {
-    c->_compositor->deleteImportanceMapType((Comp::ImportanceMapMode)info[0]->Int32Value());
+    c->_compositor->deleteImportanceMapType((Comp::ImportanceMapMode)Nan::To<int>(info[0]).ToChecked());
   }
   else {
     Nan::ThrowError("compositor.deleteImporanceMapType(int) argument error");
@@ -3030,7 +3030,7 @@ void CompositorWrapper::createClickMap(const Nan::FunctionCallbackInfo<v8::Value
   nullcheck(c->_compositor, "compositor.createClickMap");
 
   if (info[0]->IsNumber() && info[1]->IsObject()) {
-    Comp::ImportanceMapMode mode = (Comp::ImportanceMapMode)(info[0]->IntegerValue());
+    Comp::ImportanceMapMode mode = (Comp::ImportanceMapMode)(Nan::To<int>(info[0]).ToChecked());
 
     Nan::MaybeLocal<v8::Object> maybe1 = Nan::To<v8::Object>(info[1]);
     if (maybe1.IsEmpty()) {
@@ -3173,14 +3173,14 @@ void CompositorWrapper::goalSelect(const Nan::FunctionCallbackInfo<v8::Value>& i
   if (info[0]->IsObject() && info[1]->IsObject() && info[2]->IsNumber() && info[3]->IsNumber()) {
     // info[0] should contain a goal object
     v8::Local<v8::Object> goal = info[0].As<v8::Object>();
-    Comp::GoalType gt = (Comp::GoalType)(Nan::Get(goal, Nan::New("type").ToLocalChecked()).ToLocalChecked()->IntegerValue());
-    Comp::GoalTarget ga = (Comp::GoalTarget)(Nan::Get(goal, Nan::New("target").ToLocalChecked()).ToLocalChecked()->IntegerValue());
+    Comp::GoalType gt = (Comp::GoalType)Nan::To<int>(Nan::Get(goal, Nan::New("type").ToLocalChecked()).ToLocalChecked()).ToChecked();
+    Comp::GoalTarget ga = (Comp::GoalTarget)Nan::To<int>(Nan::Get(goal, Nan::New("target").ToLocalChecked()).ToLocalChecked()).ToChecked();
     v8::Local<v8::Object> color = Nan::Get(goal, Nan::New("color").ToLocalChecked()).ToLocalChecked().As<v8::Object>();
 
     Comp::RGBAColor targetColor;
-    targetColor._r = Nan::Get(color, Nan::New("r").ToLocalChecked()).ToLocalChecked()->NumberValue();
-    targetColor._g = Nan::Get(color, Nan::New("g").ToLocalChecked()).ToLocalChecked()->NumberValue();
-    targetColor._b = Nan::Get(color, Nan::New("b").ToLocalChecked()).ToLocalChecked()->NumberValue();
+    targetColor._r = (float)Nan::To<double>(Nan::Get(color, Nan::New("r").ToLocalChecked()).ToLocalChecked()).ToChecked();
+    targetColor._g = (float)Nan::To<double>(Nan::Get(color, Nan::New("g").ToLocalChecked()).ToLocalChecked()).ToChecked();
+    targetColor._b = (float)Nan::To<double>(Nan::Get(color, Nan::New("b").ToLocalChecked()).ToLocalChecked()).ToChecked();
     targetColor._a = 1;
 
     Comp::Goal g(gt, ga);
@@ -3194,17 +3194,17 @@ void CompositorWrapper::goalSelect(const Nan::FunctionCallbackInfo<v8::Value>& i
     ContextWrapper* ctx = Nan::ObjectWrap::Unwrap<ContextWrapper>(maybe1.ToLocalChecked());
 
     // targets
-    int x = info[2]->IntegerValue();
-    int y = info[3]->IntegerValue();
+    int x = Nan::To<int>(info[2]).ToChecked();
+    int y = Nan::To<int>(info[3]).ToChecked();
 
     map<string, map<Comp::AdjustmentType, vector<Comp::GoalResult>>> results;
     if (info[4]->IsNumber() && info[5]->IsNumber()) {
-      int w = info[4]->IntegerValue();
-      int h = info[5]->IntegerValue();
+      int w = Nan::To<int>(info[4]).ToChecked();
+      int h = Nan::To<int>(info[5]).ToChecked();
 
       int maxLevel = 100;
       if (info[6]->IsNumber()) {
-        maxLevel = info[6]->IntegerValue();
+        maxLevel = Nan::To<int>(info[6]).ToChecked();
       }
 
       results = c->_compositor->goalSelect(g, ctx->_context, x, y, w, h, maxLevel);
@@ -3212,7 +3212,7 @@ void CompositorWrapper::goalSelect(const Nan::FunctionCallbackInfo<v8::Value>& i
     else {
       int maxLevel = 100;
       if (info[4]->IsNumber())
-        maxLevel = info[4]->IntegerValue();
+        maxLevel = Nan::To<int>(info[4]).ToChecked();
 
       results = c->_compositor->goalSelect(g, ctx->_context, x, y, maxLevel);
     }
@@ -3273,8 +3273,8 @@ void CompositorWrapper::addPoissonDiskCache(const Nan::FunctionCallbackInfo<v8::
   nullcheck(c->_compositor, "compositor.addPoissonDiskCache");
 
   if (info[0]->IsNumber() && info[1]->IsNumber()) {
-    int n = info[0]->IntegerValue();
-    int level = info[1]->IntegerValue();
+    int n = Nan::To<int>(info[0]).ToChecked();
+    int level = Nan::To<int>(info[1]).ToChecked();
     int k = 30;
 
     if (info[2]->IsNumber()) {
@@ -3305,7 +3305,7 @@ void CompositorWrapper::addGroup(const Nan::FunctionCallbackInfo<v8::Value>& inf
 
     set<string> layers;
     v8::Local<v8::Array> arr = info[1].As<v8::Array>();
-    for (int i = 0; i < arr->Length(); i++) {
+    for (unsigned int i = 0; i < arr->Length(); i++) {
       Nan::Utf8String av(Nan::Get(arr, i).ToLocalChecked());
       string lname(*av);
 
@@ -3344,7 +3344,7 @@ void CompositorWrapper::addGroupEffect(const Nan::FunctionCallbackInfo<v8::Value
     }
 
     Comp::ImageEffect effect;
-    int mode = Nan::Get(obj, Nan::New("mode").ToLocalChecked()).ToLocalChecked()->IntegerValue();
+    int mode = Nan::To<int>(Nan::Get(obj, Nan::New("mode").ToLocalChecked()).ToLocalChecked()).ToChecked();
     effect._mode = (Comp::EffectMode)mode;
 
     if (mode == Comp::EffectMode::STROKE) {
@@ -3358,9 +3358,9 @@ void CompositorWrapper::addGroupEffect(const Nan::FunctionCallbackInfo<v8::Value
       effect._width = Nan::Get(obj, Nan::New("width").ToLocalChecked()).ToLocalChecked()->IntegerValue();
 
       auto rgb = Nan::Get(obj, Nan::New("color").ToLocalChecked()).ToLocalChecked().As<v8::Object>();
-      effect._color._r = Nan::Get(rgb, Nan::New("r").ToLocalChecked()).ToLocalChecked()->NumberValue();
-      effect._color._g = Nan::Get(rgb, Nan::New("g").ToLocalChecked()).ToLocalChecked()->NumberValue();
-      effect._color._b = Nan::Get(rgb, Nan::New("b").ToLocalChecked()).ToLocalChecked()->NumberValue();
+      effect._color._r = (float)Nan::To<double>(Nan::Get(rgb, Nan::New("r").ToLocalChecked()).ToLocalChecked()).ToChecked();
+      effect._color._g = (float)Nan::To<double>(Nan::Get(rgb, Nan::New("g").ToLocalChecked()).ToLocalChecked()).ToChecked();
+      effect._color._b = (float)Nan::To<double>(Nan::Get(rgb, Nan::New("b").ToLocalChecked()).ToLocalChecked()).ToChecked();
     }
 
     c->_compositor->setGroupEffect(group, effect);
@@ -3381,7 +3381,7 @@ void CompositorWrapper::addGroupFromExistingLayer(const Nan::FunctionCallbackInf
 
     set<string> layers;
     v8::Local<v8::Array> arr = info[1].As<v8::Array>();
-    for (int i = 0; i < arr->Length(); i++) {
+    for (unsigned int i = 0; i < arr->Length(); i++) {
       Nan::Utf8String av(Nan::Get(arr, i).ToLocalChecked());
       string lname(*av);
 
@@ -3465,10 +3465,10 @@ void CompositorWrapper::setGroupOrder(const Nan::FunctionCallbackInfo<v8::Value>
     // assumes array of object pairs
     v8::Local<v8::Array> vals = info[0].As<v8::Array>();
     multimap<float, string> order;
-    for (int i = 0; i < vals->Length(); i++) {
+    for (unsigned int i = 0; i < vals->Length(); i++) {
       v8::Local<v8::Object> obj = Nan::Get(vals, i).ToLocalChecked().As<v8::Object>();
 
-      float val = Nan::Get(obj, Nan::New("val").ToLocalChecked()).ToLocalChecked()->NumberValue();
+      float val = (float)Nan::To<double>(Nan::Get(obj, Nan::New("val").ToLocalChecked()).ToLocalChecked()).ToChecked();
       Nan::Utf8String n(Nan::Get(obj, Nan::New("group").ToLocalChecked()).ToLocalChecked());
       string group(*n);
 
@@ -3562,7 +3562,7 @@ void CompositorWrapper::setGroupLayers(const Nan::FunctionCallbackInfo<v8::Value
     v8::Local<v8::Array> arr = info[1].As<v8::Array>();
 
     set<string> layers;
-    for (int i = 0; i < arr->Length(); i++) {
+    for (unsigned int i = 0; i < arr->Length(); i++) {
       Nan::Utf8String str(Nan::Get(arr, i).ToLocalChecked());
       layers.insert(string(*str));
     }
@@ -3755,7 +3755,7 @@ void CompositorWrapper::layerHistogramIntersect(const Nan::FunctionCallbackInfo<
     Nan::Utf8String i0(info[1]);
     Nan::Utf8String i1(info[2]);
 
-    float binSize = 0.05;
+    float binSize = 0.05f;
     if (info[3]->IsNumber()) {
       binSize = Nan::To<double>(info[3]).ToChecked();
     }
@@ -3795,7 +3795,7 @@ void CompositorWrapper::propLayerHistogramIntersect(const Nan::FunctionCallbackI
     Nan::Utf8String i0(info[1]);
     Nan::Utf8String i1(info[2]);
 
-    float binSize = 0.05;
+    float binSize = 0.05f;
     if (info[3]->IsNumber()) {
       binSize = Nan::To<double>(info[3]).ToChecked();
     }
@@ -4011,7 +4011,7 @@ void ClickMapWrapper::compute(const Nan::FunctionCallbackInfo<v8::Value>& info)
   nullcheck(c->_map, "ClickMap.compute");
 
   if (info[0]->IsNumber()) {
-    c->_map->compute(info[0]->IntegerValue());
+    c->_map->compute(Nan::To<int>(info[0]).ToChecked());
   }
   else {
     Nan::ThrowError("ClickMap.compute(int) argument error");
@@ -4024,7 +4024,7 @@ void ClickMapWrapper::visualize(const Nan::FunctionCallbackInfo<v8::Value>& info
   nullcheck(c->_map, "ClickMap.visualize");
 
   if (info[0]->IsNumber()) {
-    Comp::Image* img = c->_map->visualize((Comp::ClickMap::VisualizationType)(info[0]->IntegerValue()));
+    Comp::Image* img = c->_map->visualize((Comp::ClickMap::VisualizationType)(Nan::To<int>(info[0]).ToChecked()));
 
     const int argc = 2;
     v8::Local<v8::Value> argv[argc] = { Nan::New<v8::External>(img), Nan::New(true) };
@@ -4043,7 +4043,7 @@ void ClickMapWrapper::active(const Nan::FunctionCallbackInfo<v8::Value>& info)
   nullcheck(c->_map, "ClickMap.active");
 
   if (info[0]->IsNumber() && info[1]->IsNumber()) {
-    vector<string> names = c->_map->activeLayers(info[0]->IntegerValue(), info[1]->IntegerValue());
+    vector<string> names = c->_map->activeLayers(Nan::To<int>(info[0]).ToChecked(), Nan::To<int>(info[1]).ToChecked());
 
     v8::Local<v8::Array> ret = Nan::New<v8::Array>();
 
@@ -4120,12 +4120,12 @@ void ModelWrapper::analyze(const Nan::FunctionCallbackInfo<v8::Value>& info)
     v8::Local<v8::Object> data = info[0].As<v8::Object>();
 
     map<string, vector<string>> analysisData;
-    auto keys = data->GetOwnPropertyNames();
-    for (int i = 0; i < keys->Length(); i++) {
-      v8::Local<v8::Array> filenames = data->Get(Nan::Get(keys, i).ToLocalChecked()).As<v8::Array>();
+    auto keys = Nan::GetOwnPropertyNames(data).ToLocalChecked();
+    for (unsigned int i = 0; i < keys->Length(); i++) {
+      v8::Local<v8::Array> filenames = Nan::Get(data, Nan::Get(keys, i).ToLocalChecked()).ToLocalChecked().As<v8::Array>();
 
       vector<string> files;
-      for (int j = 0; j < filenames->Length(); j++) {
+      for (unsigned int j = 0; j < filenames->Length(); j++) {
         Nan::Utf8String val0(Nan::Get(filenames, j).ToLocalChecked());
         string file(*val0);
 
@@ -4208,10 +4208,10 @@ void ModelWrapper::nonParametricSample(const Nan::FunctionCallbackInfo<v8::Value
 
   v8::Local<v8::Object> axisData = info[0].As<v8::Object>();
   map<string, Comp::Context> axes;
-  v8::Local<v8::Array> props = axisData->GetOwnPropertyNames();
+  v8::Local<v8::Array> props = Nan::GetOwnPropertyNames(axisData).ToLocalChecked();
   
-  for (int i = 0; i < props->Length(); i++) {
-    Nan::MaybeLocal<v8::Object> maybe1 = Nan::To<v8::Object>(axisData->Get(Nan::Get(props, i).ToLocalChecked()));
+  for (unsigned int i = 0; i < props->Length(); i++) {
+    Nan::MaybeLocal<v8::Object> maybe1 = Nan::To<v8::Object>(Nan::Get(axisData, Nan::Get(props, i).ToLocalChecked()).ToLocalChecked());
     if (maybe1.IsEmpty()) {
       continue;
     }
@@ -4229,7 +4229,7 @@ void ModelWrapper::nonParametricSample(const Nan::FunctionCallbackInfo<v8::Value
 
   int k = -1;
   if (info[2]->IsNumber()) {
-    k = info[2]->Int32Value();
+    k = Nan::To<int>(info[2]).ToChecked();
   }
 
   Comp::Context ctx = m->_model->nonParametricLocalSample(axes, alpha, k);
@@ -4273,12 +4273,12 @@ void ModelWrapper::schemaSample(const Nan::FunctionCallbackInfo<v8::Value>& info
   // convert vector to c++ vector
   v8::Local<v8::Array> i1 = info[1].As<v8::Array>();
   vector<Comp::AxisConstraint> ac;
-  for (int i = 0; i < i1->Length(); i++) {
+  for (unsigned int i = 0; i < i1->Length(); i++) {
     v8::Local<v8::Object> co = Nan::Get(i1, i).ToLocalChecked().As<v8::Object>();
     
     Comp::AxisConstraint constraint;
-    v8::Local<v8::Array> keys = co->GetOwnPropertyNames();
-    for (int j = 0; j < keys->Length(); j++) {
+    v8::Local<v8::Array> keys = Nan::GetOwnPropertyNames(co).ToLocalChecked();
+    for (unsigned int j = 0; j < keys->Length(); j++) {
       Nan::Utf8String prop(Nan::Get(keys, j).ToLocalChecked());
       string propName(*prop);
 
@@ -4381,7 +4381,7 @@ void ModelWrapper::addSlider(const Nan::FunctionCallbackInfo<v8::Value>& info)
     name = string(*sliderName);
 
     v8::Local<v8::Array> paramData = info[1].As<v8::Array>();
-    for (int i = 0; i < paramData->Length(); i++) {
+    for (unsigned int i = 0; i < paramData->Length(); i++) {
       v8::Local<v8::Object> objData = Nan::Get(paramData, i).ToLocalChecked().As<v8::Object>();
       Comp::LayerParamInfo param;
 
@@ -4414,20 +4414,20 @@ void ModelWrapper::addSlider(const Nan::FunctionCallbackInfo<v8::Value>& info)
       string funcType = string(*t);
 
       if (funcType == "dynamicSine") {
-        float f = excGet(objData, "f")->NumberValue();
-        float phase = excGet(objData, "phase")->NumberValue();
-        float A0 = excGet(objData, "A0")->NumberValue();
-        float A1 = excGet(objData, "A1")->NumberValue();
-        float D0 = excGet(objData, "D0")->NumberValue();
-        float D1 = excGet(objData, "D1")->NumberValue();
+        float f = (float)Nan::To<double>(excGet(objData, "f")).ToChecked();
+        float phase = (float)Nan::To<double>(excGet(objData, "phase")).ToChecked();
+        float A0 = (float)Nan::To<double>(excGet(objData, "A0")).ToChecked();
+        float A1 = (float)Nan::To<double>(excGet(objData, "A1")).ToChecked();
+        float D0 = (float)Nan::To<double>(excGet(objData, "D0")).ToChecked();
+        float D1 = (float)Nan::To<double>(excGet(objData, "D1")).ToChecked();
 
         shared_ptr<Comp::ParamFunction> func = shared_ptr<Comp::ParamFunction>(new Comp::DynamicSine(f, phase, A0, A1, D0, D1));
         funcs.push_back(func);
       }
       else if (funcType == "sawtooth") {
         int cycles = excGet(objData, "cycles")->Int32Value();
-        float min = excGet(objData, "min")->NumberValue();
-        float max = excGet(objData, "max")->NumberValue();
+        float min = (float)Nan::To<double>(excGet(objData, "min")).ToChecked();
+        float max = (float)Nan::To<double>(excGet(objData, "max")).ToChecked();
         bool inverted = excGet(objData, "inverted")->BooleanValue();
 
         shared_ptr<Comp::ParamFunction> func = shared_ptr<Comp::ParamFunction>(new Comp::Sawtooth(cycles, min, max, inverted));
@@ -4440,7 +4440,7 @@ void ModelWrapper::addSlider(const Nan::FunctionCallbackInfo<v8::Value>& info)
         auto xa = excGet(objData, "xs").As<v8::Array>();
         auto ya = excGet(objData, "ys").As<v8::Array>();
 
-        for (int i = 0; i < xa->Length(); i++) {
+        for (unsigned int i = 0; i < xa->Length(); i++) {
           xs.push_back(Nan::Get(xa, i).ToLocalChecked()->NumberValue());
           ys.push_back(Nan::Get(ya, i).ToLocalChecked()->NumberValue());
         }
@@ -4476,7 +4476,7 @@ void ModelWrapper::addSliderFromExamples(const Nan::FunctionCallbackInfo<v8::Val
     name = string(*sliderName);
 
     v8::Local<v8::Array> filenames = info[1].As<v8::Array>();
-    for (int i = 0; i < filenames->Length(); i++) {
+    for (unsigned int i = 0; i < filenames->Length(); i++) {
       Nan::Utf8String fname(Nan::Get(filenames, i).ToLocalChecked());
       files.push_back(string(*fname));
     }
@@ -4544,7 +4544,7 @@ void ModelWrapper::exportSliderGraph(const Nan::FunctionCallbackInfo<v8::Value>&
   int n = 1000;
 
   if (info[2]->IsInt32()) {
-    n = info[2]->Int32Value();
+    n = Nan::To<int>(info[2]).ToChecked();
   }
 
   m->_model->getSlider(id).exportGraphData(filename, n);
@@ -4594,7 +4594,7 @@ void UISliderWrapper::New(const Nan::FunctionCallbackInfo<v8::Value>& info)
     Nan::Utf8String i1(info[1]);
     param = string(*i1);
 
-    t = (Comp::AdjustmentType)(info[2]->Int32Value());
+    t = (Comp::AdjustmentType)(Nan::To<int>(info[2]).ToChecked());
 
     Comp::UISlider* slider = new Comp::UISlider(layer, param, t);
     UISliderWrapper* sw = new UISliderWrapper(slider);
@@ -4785,8 +4785,8 @@ void UIMetaSliderWrapper::New(const Nan::FunctionCallbackInfo<v8::Value>& info)
 
     // slider loading time
     v8::Local<v8::Object> sliders = Nan::Get(obj, Nan::New("subSliders").ToLocalChecked()).ToLocalChecked().As<v8::Object>();
-    auto ids = sliders->GetOwnPropertyNames();
-    for (int i = 0; i < ids->Length(); i++) {
+    auto ids = Nan::GetOwnPropertyNames(sliders).ToLocalChecked();
+    for (unsigned int i = 0; i < ids->Length(); i++) {
       auto sliderObj = sliders->Get(Nan::Get(ids, i).ToLocalChecked()).As<v8::Object>();
 
       Nan::Utf8String layer(Nan::Get(sliderObj, Nan::New("layer").ToLocalChecked()).ToLocalChecked());
@@ -4798,7 +4798,7 @@ void UIMetaSliderWrapper::New(const Nan::FunctionCallbackInfo<v8::Value>& info)
       auto xsa = Nan::Get(sliderObj, Nan::New("xs").ToLocalChecked()).ToLocalChecked().As<v8::Array>();
       auto ysa = Nan::Get(sliderObj, Nan::New("ys").ToLocalChecked()).ToLocalChecked().As<v8::Array>();
 
-      for (int i = 0; i < xsa->Length(); i++) {
+      for (unsigned int i = 0; i < xsa->Length(); i++) {
         xs.push_back(Nan::Get(xsa, i).ToLocalChecked()->NumberValue());
         ys.push_back(Nan::Get(ysa, i).ToLocalChecked()->NumberValue());
       }
@@ -4828,7 +4828,7 @@ void UIMetaSliderWrapper::addSlider(const Nan::FunctionCallbackInfo<v8::Value>& 
     Nan::Utf8String i1(info[1]);
     string param(*i1);
 
-    Comp::AdjustmentType t = (Comp::AdjustmentType)(info[2]->Int32Value());
+    Comp::AdjustmentType t = (Comp::AdjustmentType)(Nan::To<int>(info[2]).ToChecked());
 
     // arrays
     if (info[3]->IsArray() && info[4]->IsArray()) {
@@ -4842,7 +4842,7 @@ void UIMetaSliderWrapper::addSlider(const Nan::FunctionCallbackInfo<v8::Value>& 
         Nan::ThrowError("Array lengths do not match, slider not added");
       }
 
-      for (int i = 0; i < xsr->Length(); i++) {
+      for (unsigned int i = 0; i < xsr->Length(); i++) {
         xs.push_back(Nan::Get(xsr, i).ToLocalChecked()->NumberValue());
         ys.push_back(Nan::Get(ysr, i).ToLocalChecked()->NumberValue());
       }
@@ -4944,9 +4944,9 @@ void UIMetaSliderWrapper::setPoints(const Nan::FunctionCallbackInfo<v8::Value>& 
       v8::Local<v8::Array> a2 = info[2].As<v8::Array>();
 
       if (a1->Length() == a2->Length()) {
-        for (int i = 0; i < a1->Length(); i++) {
-          xs.push_back(Nan::Get(a1, i).ToLocalChecked()->NumberValue());
-          ys.push_back(Nan::Get(a2, i).ToLocalChecked()->NumberValue());
+        for (unsigned int i = 0; i < a1->Length(); i++) {
+          xs.push_back((float)Nan::To<double>(Nan::Get(a1, i).ToLocalChecked()).ToChecked());
+          ys.push_back((float)Nan::To<double>(Nan::Get(a2, i).ToLocalChecked()).ToChecked());
         }
 
         s->_mSlider->setPoints(id, xs, ys);
@@ -5144,9 +5144,9 @@ void UISamplerWrapper::New(const Nan::FunctionCallbackInfo<v8::Value>& info)
 
     // params
     v8::Local<v8::Object> params = Nan::Get(obj, Nan::New("params").ToLocalChecked()).ToLocalChecked().As<v8::Object>();
-    auto names = params->GetOwnPropertyNames();
-    for (int i = 0; i < names->Length(); i++) {
-      v8::Local<v8::Object> p = params->Get(Nan::Get(names, i).ToLocalChecked()).As<v8::Object>();
+    auto names = Nan::GetOwnPropertyNames(params).ToLocalChecked();
+    for (unsigned int i = 0; i < names->Length(); i++) {
+      v8::Local<v8::Object> p = Nan::Get(params, Nan::Get(names, i).ToLocalChecked()).ToLocalChecked().As<v8::Object>();
       Comp::LayerParamInfo inf;
 
       Nan::Utf8String layer(Nan::Get(p, Nan::New("layer").ToLocalChecked()).ToLocalChecked());
@@ -5199,7 +5199,7 @@ void UISamplerWrapper::addParam(const Nan::FunctionCallbackInfo<v8::Value>& info
     Nan::Utf8String i1(info[1]);
     string param(*i1);
 
-    Comp::AdjustmentType t = (Comp::AdjustmentType)(info[2]->Int32Value());
+    Comp::AdjustmentType t = (Comp::AdjustmentType)(Nan::To<int>(info[2]).ToChecked());
 
     Comp::LayerParamInfo p(t, layer, param);
     string id = s->_sampler->addParam(p);

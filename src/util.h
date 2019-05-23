@@ -559,8 +559,8 @@ namespace Comp {
   {
     // convert to XYZ first, D50 is the Photoshop ref white
     // D50 = 96.4212, 100.0, 82.5188
-    T e = 0.008856;
-    T k = 903.3;
+    T e = (T)0.008856;
+    T k = (T)903.3;
 
     T fy = (L + 16) / 116;
     T fx = a / 500 + fy;
