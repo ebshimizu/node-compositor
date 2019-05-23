@@ -10,7 +10,6 @@ author: Evan Shimizu
 #include "Compositor.h"
 #include "util.h"
 #include "Model.h"
-#include "testHarness.h"
 
 #include <nan.h>
 
@@ -23,8 +22,6 @@ void log(const Nan::FunctionCallbackInfo<v8::Value>& info);
 void setLogLocation(const Nan::FunctionCallbackInfo<v8::Value>& info);
 void setLogLevel(const Nan::FunctionCallbackInfo<v8::Value>& info);
 void hardware_concurrency(const Nan::FunctionCallbackInfo<v8::Value>& info);
-void runTest(const Nan::FunctionCallbackInfo<v8::Value>& info);
-void runAllTest(const Nan::FunctionCallbackInfo<v8::Value>& info);
 
 class ImageWrapper : public Nan::ObjectWrap {
 public:

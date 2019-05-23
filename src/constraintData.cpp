@@ -430,8 +430,8 @@ vector<ConnectedComponent> ConstraintData::computeConnectedComponents(shared_ptr
   // (each pixel only visited once). The dfs will record which pixels it visits in a new image.
   // pixels are considered connected and the dfs will affect them if they are a) the same type
   // and b) (for color only so far) the same color
-  for (int y = 0; y < pixels->getHeight(); y++) {
-    for (int x = 0; x < pixels->getWidth(); x++) {
+  for (unsigned int y = 0; y < pixels->getHeight(); y++) {
+    for (unsigned int x = 0; x < pixels->getWidth(); x++) {
       if (visited(x, y) == 0) {
         // start a DFS from this point with a new log image
         shared_ptr<Image> component = shared_ptr<Image>(new Image(pixels->getWidth(), pixels->getHeight()));
@@ -485,7 +485,7 @@ void ConstraintData::recordedDFS(int originX, int originY, Grid2D<int>& visited,
 
     for (auto& n : neighbors) {
       // bounds check
-      if (n.first < 0 || n.first >= pxLog->getWidth() || n.second < 0 || n.second >= pxLog->getHeight())
+      if (n.first < 0 || (unsigned int)n.first >= pxLog->getWidth() || n.second < 0 || (unsigned int)n.second >= pxLog->getHeight())
         continue;
 
       // type and already visited check.
@@ -513,8 +513,8 @@ vector<Superpixel> ConstraintData::extractSuperpixels(ConnectedComponent& compon
   vector<Pointi> coords;
   shared_ptr<Image> ccBounds = component._pixels;
 
-  for (int y = 0; y < px->getHeight(); y++) {
-    for (int x = 0; x < px->getWidth(); x++) {
+  for (unsigned int y = 0; y < px->getHeight(); y++) {
+    for (unsigned int x = 0; x < px->getWidth(); x++) {
       if (ccBounds->getPixel(x, y)._a > 0) {
         // if part of the component, add to coordinate list and assignment state
         assignmentState(x, y) = -1;

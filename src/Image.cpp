@@ -170,7 +170,7 @@ namespace Comp {
 
   void Image::setPixel(int x, int y, float r, float g, float b, float a)
   {
-    if (x < 0 || x >= _w || y < 0 || y >= _h)
+    if (x < 0 || (unsigned int)x >= _w || y < 0 || (unsigned int)y >= _h)
       return;
 
     int index = (x + y * _w )* 4;
@@ -266,8 +266,8 @@ namespace Comp {
     vector<Eigen::VectorXd> patch;
 
     // starts in top left, proceeds until dimensions run out.
-    for (int y = 0; y < getHeight(); y += patchSize) {
-      for (int x = 0; x < getWidth(); x += patchSize) {
+    for (unsigned int y = 0; y < getHeight(); y += (unsigned int)patchSize) {
+      for (unsigned int x = 0; x < getWidth(); x += (unsigned int)patchSize) {
         vector<double> luma;
         int count = 0;
 
@@ -278,7 +278,7 @@ namespace Comp {
           for (int i = 0; i < patchSize; i++) {
             int xloc = x + i;
 
-            if (xloc >= getWidth() || yloc >= getHeight())
+            if ((unsigned int)xloc >= getWidth() || (unsigned int)yloc >= getHeight())
               continue;
 
             // premult color n stuff

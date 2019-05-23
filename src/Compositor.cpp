@@ -1217,7 +1217,7 @@ namespace Comp {
       li._mssim = dbase->MSSIM(base, 16, 1, 1, 1);
 
       // derivative
-      li._deltaMag = finiteDifference(base, dbase, 0.01);
+      li._deltaMag = finiteDifference(base, dbase, 0.01f);
       
       // total alpha/luma
       if (l.isAdjustmentLayer()) {

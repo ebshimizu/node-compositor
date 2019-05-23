@@ -74,50 +74,6 @@ void hardware_concurrency(const Nan::FunctionCallbackInfo<v8::Value>& info)
   info.GetReturnValue().Set(Nan::New(thread::hardware_concurrency()));
 }
 
-void runTest(const Nan::FunctionCallbackInfo<v8::Value>& info)
-{
-  // get the compositor
-  Nan::MaybeLocal<v8::Object> maybe1 = Nan::To<v8::Object>(info[0]);
-  if (maybe1.IsEmpty()) {
-    Nan::ThrowError("Object found is empty! (in runTest())");
-  }
-  CompositorWrapper* comp = Nan::ObjectWrap::Unwrap<CompositorWrapper>(maybe1.ToLocalChecked());
-
-  int x, y;
-
-  if (info[1]->IsInt32() && info[2]->IsInt32()) {
-    x = info[1]->Int32Value();
-    y = info[2]->Int32Value();
-  }
-  else {
-    Nan::ThrowError("runTests needs an (x, y) pixel coordinate");
-  }
-
-  info.GetReturnValue().Set(Comp::compare(comp->_compositor, x, y));
-}
-
-void runAllTest(const Nan::FunctionCallbackInfo<v8::Value>& info)
-{
-  // get the compositor
-  Nan::MaybeLocal<v8::Object> maybe1 = Nan::To<v8::Object>(info[0]);
-  if (maybe1.IsEmpty()) {
-    Nan::ThrowError("Object found is empty! (in runTest())");
-  }
-  CompositorWrapper* comp = Nan::ObjectWrap::Unwrap<CompositorWrapper>(maybe1.ToLocalChecked());
-
-  string output;
-
-  if (info[1]->IsString()) {
-    v8::String::Utf8Value val0(info[1]->ToString());
-    output = string(*val0);
-  }
-  else {
-    Nan::ThrowError("runAllTests needs an output filename");
-  }
-
-  Comp::compareAll(comp->_compositor, output);
-}
-
 void asyncSampleEvent(uv_work_t * req)
 {
   // construct the proper objects and do the callback
@@ -753,7 +709,7 @@ void LayerRef::Init(v8::Local<v8::Object> exports)
   Nan::SetPrototypeMethod(tpl, "isPrecomp", isPrecomp);
 
   layerConstructor.Reset(tpl->GetFunction());
-  exports->Set(Nan::New("Layer").ToLocalChecked(), tpl->GetFunction());
+  Nan::Set(exports, Nan::New("Layer").ToLocalChecked(), tpl->GetFunction());
 }
 
 LayerRef::LayerRef(Comp::Layer * src)
@@ -1323,7 +1279,7 @@ void LayerRef::addPhotoFilter(const Nan::FunctionCallbackInfo<v8::Value>& info)
   bool preserveLuma = color->Get(Nan::New("preserveLuma").ToLocalChecked())->BooleanValue();
   float density = (float)color->Get(Nan::New("density").ToLocalChecked())->NumberValue();
   
-  if (color->Has(Nan::New("luminance").ToLocalChecked())) {
+  if (Nan::Has(color, Nan::New("luminance").ToLocalChecked()).ToChecked()) {
     // convert from lab to rgb
     Comp::Utils<float>::RGBColorT rgb = Comp::Utils<float>::LabToRGB((float)color->Get(Nan::New("luminance").ToLocalChecked())->NumberValue(),
       (float)color->Get(Nan::New("a").ToLocalChecked())->NumberValue(),
@@ -1331,7 +1287,7 @@ void LayerRef::addPhotoFilter(const Nan::FunctionCallbackInfo<v8::Value>& info)
 
     layer->_layer->addPhotoFilterAdjustment(preserveLuma, rgb._r, rgb._g, rgb._b, density);
   }
-  else if (color->Has(Nan::New("hue").ToLocalChecked())) {
+  else if (Nan::Has(color, Nan::New("hue").ToLocalChecked()).ToChecked()) {
     // convert from hsl to rgb
     Comp::Utils<float>::RGBColorT rgb = Comp::Utils<float>::HSLToRGB((float)color->Get(Nan::New("hue").ToLocalChecked())->NumberValue(),
       (float)color->Get(Nan::New("saturation").ToLocalChecked())->NumberValue(),
@@ -1339,7 +1295,7 @@ void LayerRef::addPhotoFilter(const Nan::FunctionCallbackInfo<v8::Value>& info)
 
     layer->_layer->addPhotoFilterAdjustment(preserveLuma, rgb._r, rgb._g, rgb._b, density);
   }
-  else if (color->Has(Nan::New("r").ToLocalChecked())) {
+  else if (Nan::Has(color, Nan::New("r").ToLocalChecked()).ToChecked()) {
     // just do the thing
 
     layer->_layer->addPhotoFilterAdjustment(preserveLuma, (float)color->Get(Nan::New("r").ToLocalChecked())->NumberValue(),

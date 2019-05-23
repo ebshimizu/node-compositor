@@ -3,7 +3,7 @@
 namespace Comp {
 
 ExpSearchSample::ExpSearchSample(shared_ptr<Image> img, Context ctx, vector<double> ctxvec) :
-  _render(img), _ctx(ctx), _ctxVec(ctxvec), _brightness(2), _hue(5), _sat(0.05)
+  _render(img), _ctx(ctx), _ctxVec(ctxvec), _brightness(2), _hue(5), _sat(0.05f)
 {
   preProcess();
 }
