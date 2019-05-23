@@ -738,8 +738,8 @@ namespace Comp {
     Image* original = new Image(*this);
 
     // basically any pixel that borders an outside pixel gets the effect
-    for (int y = 0; y < _h; y++) {
-      for (int x = 0; x < _w; x++) {
+    for (unsigned int y = 0; y < _h; y++) {
+      for (unsigned int x = 0; x < _w; x++) {
         // conditions for stroke: current image pixel is non-zero alpha bordering zero-alpha pixel
         if (original->bordersZeroAlpha(x, y)) {
           // if true, then add stroke if the pixel also borders the outside of the current group
@@ -758,7 +758,7 @@ namespace Comp {
                 int dx = sx + x;
 
                 // bounds check
-                if (dx < 0 || dx >= _w || dy < 0 || dy >= _h)
+                if (dx < 0 || (unsigned int)dx >= _w || dy < 0 || (unsigned int)dy >= _h)
                   continue;
 
                 // existing pixel check
@@ -866,9 +866,9 @@ namespace Comp {
         int yp = y + yd[j];
 
         // bounds check
-        if (xp < 0 || xp >= inclusionMap->_w)
+        if (xp < 0 || (unsigned int)xp >= inclusionMap->_w)
           continue;
-        if (yp < 0 || yp >= inclusionMap->_h)
+        if (yp < 0 || (unsigned int)yp >= inclusionMap->_h)
           continue;
 
         // directional check
@@ -899,7 +899,7 @@ namespace Comp {
         int yp = y + yd[j];
 
         // bounds check
-        if (xp < 0 || xp >= _w || yp < 0 || yp >= _h)
+        if (xp < 0 || (unsigned int)xp >= _w || yp < 0 || (unsigned int)yp >= _h)
           continue;
 
         // directional check

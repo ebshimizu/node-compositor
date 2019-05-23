@@ -22,10 +22,10 @@ void log(const Nan::FunctionCallbackInfo<v8::Value>& info)
   }
 
   // do the thing
-  v8::String::Utf8Value val0(info[0]->ToString());
+  Nan::Utf8String val0(info[0]);
   string msg(*val0);
 
-  Comp::getLogger()->log(msg, (Comp::LogLevel)info[1]->Int32Value());
+  Comp::getLogger()->log(msg, (Comp::LogLevel)Nan::To<int32_t>(info[1]).ToChecked());
 
   info.GetReturnValue().SetNull();
 }
@@ -43,7 +43,7 @@ void setLogLocation(const Nan::FunctionCallbackInfo<v8::Value>& info)
   }
 
   // do the thing
-  v8::String::Utf8Value val0(info[0]->ToString());
+  Nan::Utf8String val0(info[0]);
   string path(*val0);
 
   Comp::getLogger()->setLogLocation(path);
@@ -64,7 +64,7 @@ void setLogLevel(const Nan::FunctionCallbackInfo<v8::Value>& info)
   }
 
   // do the thing
-  Comp::getLogger()->setLogLevel((Comp::LogLevel)info[0]->Int32Value());
+  Comp::getLogger()->setLogLevel((Comp::LogLevel)Nan::To<int32_t>(info[0]).ToChecked());
 
   info.GetReturnValue().SetNull();
 }
@@ -98,12 +98,12 @@ void asyncSampleEvent(uv_work_t * req)
   // metadata object
   v8::Local<v8::Object> metadata = Nan::New<v8::Object>();
   for (auto k : data->meta) {
-    metadata->Set(Nan::New(k.first).ToLocalChecked(), Nan::New(k.second));
+    Nan::Set(metadata, Nan::New(k.first).ToLocalChecked(), Nan::New(k.second));
   }
 
   // string metadata
   for (auto k : data->meta2) {
-    metadata->Set(Nan::New(k.first).ToLocalChecked(), Nan::New(k.second).ToLocalChecked());
+    Nan::Set(metadata, Nan::New(k.first).ToLocalChecked(), Nan::New(k.second).ToLocalChecked());
   }
 
   // construct emitter objects
@@ -119,7 +119,7 @@ void asyncNop(uv_work_t * req)
 v8::Local<v8::Value> excGet(v8::Local<v8::Object>& obj, string key)
 {
   if (Nan::HasOwnProperty(obj, Nan::New(key).ToLocalChecked()).ToChecked()) {
-    return obj->Get(Nan::New(key).ToLocalChecked());
+    return Nan::Get(obj, Nan::New(key).ToLocalChecked()).ToLocalChecked();
   }
   else {
     Nan::ThrowError(string("Object has no key " + key).c_str());
@@ -168,8 +168,8 @@ void ImageWrapper::Init(v8::Local<v8::Object> exports)
   Nan::SetPrototypeMethod(tpl, "proportionalHistogramIntersection", pctHistogramIntersect);
   Nan::SetPrototypeMethod(tpl, "chamferDistance", chamferDistance);
 
-  imageConstructor.Reset(tpl->GetFunction());
-  exports->Set(Nan::New("Image").ToLocalChecked(), tpl->GetFunction());
+  imageConstructor.Reset(Nan::GetFunction(tpl).ToLocalChecked());
+  Nan::Set(exports, Nan::New("Image").ToLocalChecked(), Nan::GetFunction(tpl).ToLocalChecked());
 }
 
 ImageWrapper::ImageWrapper(unsigned int w, unsigned int h) {
@@ -196,13 +196,13 @@ void ImageWrapper::New(const Nan::FunctionCallbackInfo<v8::Value>& info)
   ImageWrapper* img;
 
   if (info[0]->IsNumber()) {
-    unsigned int w = info[0]->Uint32Value();
-    unsigned int h = info[1]->IsUndefined() ? 0 : info[1]->Uint32Value();
+    unsigned int w = Nan::To<uint32_t>(info[0]).ToChecked();
+    unsigned int h = info[1]->IsUndefined() ? 0 : Nan::To<uint32_t>(info[1]).ToChecked();
     img = new ImageWrapper(w, h);
     img->_deleteOnDestruct = true;
   }
   else if (info[0]->IsString()) {
-    v8::String::Utf8Value val0(info[0]->ToString());
+    Nan::Utf8String val0(info[0]);
     string path(*val0);
     img = new ImageWrapper(path);
     img->_deleteOnDestruct = true;
@@ -210,7 +210,7 @@ void ImageWrapper::New(const Nan::FunctionCallbackInfo<v8::Value>& info)
   else if (info[0]->IsExternal()) {
     Comp::Image* i = static_cast<Comp::Image*>(info[0].As<v8::External>()->Value());
     img = new ImageWrapper(i);
-    img->_deleteOnDestruct = info[1]->BooleanValue();
+    img->_deleteOnDestruct = Nan::To<bool>(info[1]).ToChecked();
   }
   else {
     img = new ImageWrapper();
@@ -228,7 +228,7 @@ void ImageWrapper::getData(const Nan::FunctionCallbackInfo<v8::Value>& info) {
   auto data = image->_image->getData();
   v8::Local<v8::Uint8ClampedArray> ret = v8::Uint8ClampedArray::New(v8::ArrayBuffer::New(v8::Isolate::GetCurrent(), data.size()), 0, data.size());
   for (int i = 0; i < data.size(); i++) {
-    ret->Set(i, Nan::New(data[i]));
+    Nan::Set(ret, i, Nan::New(data[i]));
   }
 
   info.GetReturnValue().Set(ret);
@@ -262,7 +262,7 @@ void ImageWrapper::save(const Nan::FunctionCallbackInfo<v8::Value>& info)
   ImageWrapper* image = ObjectWrap::Unwrap<ImageWrapper>(info.Holder());
   nullcheck(image->_image, "image.save");
 
-  v8::String::Utf8Value val0(info[0]->ToString());
+  Nan::Utf8String val0(info[0]);
   string file(*val0);
 
   image->_image->save(file);
@@ -314,13 +314,13 @@ void ImageWrapper::structIndBinDiff(const Nan::FunctionCallbackInfo<v8::Value>& 
   }
 
   ImageWrapper* y = Nan::ObjectWrap::Unwrap<ImageWrapper>(maybe1.ToLocalChecked());
-  int patchSize = info[1]->Int32Value();
+  int patchSize = Nan::To<int32_t>(info[1]).ToChecked();
 
   vector<double> binScores = image->_image->structIndBinDiff(y->_image, patchSize);
 
   v8::Local<v8::Array> arr = Nan::New<v8::Array>();
   for (int i = 0; i < binScores.size(); i++) {
-    arr->Set(Nan::New(i), Nan::New(binScores[i]));
+    Nan::Set(arr, Nan::New(i), Nan::New(binScores[i]));
   }
   info.GetReturnValue().Set(arr);
 }
@@ -339,8 +339,8 @@ void ImageWrapper::structBinDiff(const Nan::FunctionCallbackInfo<v8::Value>& inf
   }
 
   ImageWrapper* y = Nan::ObjectWrap::Unwrap<ImageWrapper>(maybe1.ToLocalChecked());
-  int patchSize = info[1]->Int32Value();
-  double threshold = info[2]->NumberValue();
+  int patchSize = Nan::To<int>(info[1]).ToChecked();
+  double threshold = Nan::To<double>(info[2]).ToChecked();
 
   double error = image->_image->structBinDiff(y->_image, patchSize, threshold);
   info.GetReturnValue().Set(Nan::New(error));
@@ -360,7 +360,7 @@ void ImageWrapper::structTotalBinDiff(const Nan::FunctionCallbackInfo<v8::Value>
   }
 
   ImageWrapper* y = Nan::ObjectWrap::Unwrap<ImageWrapper>(maybe1.ToLocalChecked());
-  int patchSize = info[1]->Int32Value();
+  int patchSize = Nan::To<int>(info[1]).ToChecked();
 
   double error = image->_image->structTotalBinDiff(y->_image, patchSize);
   info.GetReturnValue().Set(Nan::New(error));
@@ -380,7 +380,7 @@ void ImageWrapper::structAvgBinDiff(const Nan::FunctionCallbackInfo<v8::Value>& 
   }
 
   ImageWrapper* y = Nan::ObjectWrap::Unwrap<ImageWrapper>(maybe1.ToLocalChecked());
-  int patchSize = info[1]->Int32Value();
+  int patchSize = Nan::To<int>(info[1]).ToChecked();
 
   double error = image->_image->structAvgBinDiff(y->_image, patchSize);
   info.GetReturnValue().Set(Nan::New(error));
@@ -400,8 +400,8 @@ void ImageWrapper::structPctDiff(const Nan::FunctionCallbackInfo<v8::Value>& inf
   }
 
   ImageWrapper* y = Nan::ObjectWrap::Unwrap<ImageWrapper>(maybe1.ToLocalChecked());
-  int patchSize = info[1]->Int32Value();
-  double threshold = info[2]->NumberValue();
+  int patchSize = Nan::To<int>(info[1]).ToChecked();
+  double threshold = Nan::To<double>(info[2]).ToChecked();
   
   vector<Eigen::VectorXd> patches = image->_image->patches(patchSize);
   y->_image->eliminateBinsSSIM(patches, patchSize, threshold);
@@ -430,10 +430,10 @@ void ImageWrapper::structSSIMDiff(const Nan::FunctionCallbackInfo<v8::Value>& in
   }
 
   ImageWrapper* y = Nan::ObjectWrap::Unwrap<ImageWrapper>(maybe1.ToLocalChecked());
-  int patchSize = info[1]->Int32Value();
-  double a = info[2]->NumberValue();
-  double b = info[3]->NumberValue();
-  double g = info[4]->NumberValue();
+  int patchSize = Nan::To<int>(info[1]).ToChecked();
+  double a = Nan::To<double>(info[2]).ToChecked();
+  double b = Nan::To<double>(info[3]).ToChecked();
+  double g = Nan::To<double>(info[4]).ToChecked();
 
   double res = y->_image->MSSIM(image->_image, patchSize, a, b, g);
 
@@ -446,10 +446,10 @@ void ImageWrapper::stats(const Nan::FunctionCallbackInfo<v8::Value>& info)
 
   v8::Local<v8::Object> ret = Nan::New<v8::Object>();
 
-  ret->Set(Nan::New("avgAlpha").ToLocalChecked(), Nan::New(image->_image->avgAlpha()));
-  ret->Set(Nan::New("avgLuma").ToLocalChecked(), Nan::New(image->_image->avgLuma()));
-  ret->Set(Nan::New("totalAlpha").ToLocalChecked(), Nan::New(image->_image->totalAlpha()));
-  ret->Set(Nan::New("totalLuma").ToLocalChecked(), Nan::New(image->_image->totalLuma()));
+  Nan::Set(ret, Nan::New("avgAlpha").ToLocalChecked(), Nan::New(image->_image->avgAlpha()));
+  Nan::Set(ret, Nan::New("avgLuma").ToLocalChecked(), Nan::New(image->_image->avgLuma()));
+  Nan::Set(ret, Nan::New("totalAlpha").ToLocalChecked(), Nan::New(image->_image->totalAlpha()));
+  Nan::Set(ret, Nan::New("totalLuma").ToLocalChecked(), Nan::New(image->_image->totalLuma()));
 
   info.GetReturnValue().Set(ret);
 }
@@ -478,7 +478,7 @@ void ImageWrapper::writeToImageData(const Nan::FunctionCallbackInfo<v8::Value>& 
   ImageWrapper* image = ObjectWrap::Unwrap<ImageWrapper>(info.Holder());
 
   // get the data array
-  v8::Local<v8::Uint8ClampedArray> arr = info[0].As<v8::Object>()->Get(Nan::New("data").ToLocalChecked()).As<v8::Uint8ClampedArray>();
+  v8::Local<v8::Uint8ClampedArray> arr = Nan::Get(info[0].As<v8::Object>(), Nan::New("data").ToLocalChecked()).ToLocalChecked().As<v8::Uint8ClampedArray>();
   unsigned char *data = (unsigned char*)arr->Buffer()->GetContents().Data();
 
   vector<unsigned char>& imData = image->_image->getData();
@@ -492,7 +492,7 @@ void ImageWrapper::fill(const Nan::FunctionCallbackInfo<v8::Value>& info)
   ImageWrapper* image = ObjectWrap::Unwrap<ImageWrapper>(info.Holder());
 
   if (info[0]->IsNumber() && info[1]->IsNumber() && info[2]->IsNumber()) {
-    Comp::Image* filled = image->_image->fill(info[0]->NumberValue(), info[1]->NumberValue(), info[2]->NumberValue());
+    Comp::Image* filled = image->_image->fill((float)Nan::To<double>(info[0]).ToChecked(), (float)Nan::To<double>(info[1]).ToChecked(), (float)Nan::To<double>(info[2]).ToChecked());
 
     v8::Local<v8::Function> cons = Nan::New<v8::Function>(ImageWrapper::imageConstructor);
     const int argc = 2;
@@ -515,9 +515,9 @@ void ImageWrapper::histogramIntersect(const Nan::FunctionCallbackInfo<v8::Value>
   }
   ImageWrapper* y = Nan::ObjectWrap::Unwrap<ImageWrapper>(maybe1.ToLocalChecked());
 
-  float binSize = 0.05;
+  float binSize = 0.05f;
   if (info[1]->IsNumber()) {
-    binSize = info[0]->NumberValue();
+    binSize = (float)Nan::To<double>(info[0]).ToChecked();
   }
 
   double d = image->_image->histogramIntersection(y->_image, binSize);
@@ -535,9 +535,9 @@ void ImageWrapper::pctHistogramIntersect(const Nan::FunctionCallbackInfo<v8::Val
   }
   ImageWrapper* y = Nan::ObjectWrap::Unwrap<ImageWrapper>(maybe1.ToLocalChecked());
 
-  float binSize = 0.05;
+  float binSize = 0.05f;
   if (info[1]->IsNumber()) {
-    binSize = info[0]->NumberValue();
+    binSize = (float)Nan::To<double>(info[0]).ToChecked();
   }
 
   double d = image->_image->proportionalHistogramIntersection(y->_image, binSize);
@@ -576,8 +576,8 @@ void ImportanceMapWrapper::Init(v8::Local<v8::Object> exports)
   Nan::SetPrototypeMethod(tpl, "dump", dump);
   Nan::SetPrototypeMethod(tpl, "getVal", getVal);
 
-  importanceMapConstructor.Reset(tpl->GetFunction());
-  exports->Set(Nan::New("ImportanceMap").ToLocalChecked(), tpl->GetFunction());
+  importanceMapConstructor.Reset(Nan::GetFunction(tpl).ToLocalChecked());
+  Nan::Set(exports, Nan::New("ImportanceMap").ToLocalChecked(), Nan::GetFunction(tpl).ToLocalChecked());
 }
 
 ImportanceMapWrapper::ImportanceMapWrapper(shared_ptr<Comp::ImportanceMap> m, string name, Comp::ImportanceMapMode type) :
@@ -596,9 +596,9 @@ void ImportanceMapWrapper::New(const Nan::FunctionCallbackInfo<v8::Value>& info)
   // it will throw an error if the arguments are wrong.
   if (info[0]->IsExternal() && info[1]->IsString() && info[2]->IsNumber()) {
     Comp::Compositor* c = static_cast<Comp::Compositor*>(info[0].As<v8::External>()->Value());
-    v8::String::Utf8Value i1(info[1]->ToString());
+    Nan::Utf8String i1(info[1]);
     string layerName(*i1);
-    Comp::ImportanceMapMode type = (Comp::ImportanceMapMode)(info[2]->Int32Value());
+    Comp::ImportanceMapMode type = (Comp::ImportanceMapMode)(Nan::To<int>(info[2]).ToChecked());
 
     ImportanceMapWrapper* m = new ImportanceMapWrapper(c->getImportanceMap(layerName, type), layerName, type);
     m->Wrap(info.This());
@@ -634,8 +634,8 @@ void ImportanceMapWrapper::dump(const Nan::FunctionCallbackInfo<v8::Value>& info
   }
 
   if (info[0]->IsString() && info[1]->IsString()) {
-    v8::String::Utf8Value i0(info[0]->ToString());
-    v8::String::Utf8Value i1(info[1]->ToString());
+    Nan::Utf8String i0(info[0]);
+    Nan::Utf8String i1(info[1]);
 
     m->_m->dump(string(*i0), string(*i1));
   }
@@ -652,7 +652,7 @@ void ImportanceMapWrapper::getVal(const Nan::FunctionCallbackInfo<v8::Value>& in
   }
 
   if (info[0]->IsNumber() && info[1]->IsNumber()) {
-    double val = m->_m->getVal(info[0]->Int32Value(), info[1]->Int32Value());
+    double val = m->_m->getVal(Nan::To<int>(info[0]).ToChecked(), Nan::To<int>(info[1]).ToChecked());
     info.GetReturnValue().Set(Nan::New(val));
   }
 }
@@ -708,8 +708,8 @@ void LayerRef::Init(v8::Local<v8::Object> exports)
   Nan::SetPrototypeMethod(tpl, "getPrecompOrder", getPrecompOrder);
   Nan::SetPrototypeMethod(tpl, "isPrecomp", isPrecomp);
 
-  layerConstructor.Reset(tpl->GetFunction());
-  Nan::Set(exports, Nan::New("Layer").ToLocalChecked(), tpl->GetFunction());
+  layerConstructor.Reset(Nan::GetFunction(tpl).ToLocalChecked());
+  Nan::Set(exports, Nan::New("Layer").ToLocalChecked(), Nan::GetFunction(tpl).ToLocalChecked());
 }
 
 LayerRef::LayerRef(Comp::Layer * src)
@@ -777,7 +777,7 @@ void LayerRef::visible(const Nan::FunctionCallbackInfo<v8::Value>& info)
   nullcheck(layer->_layer, "layer.visible");
   
   if (info[0]->IsBoolean()) {
-    layer->_layer->_visible = info[0]->BooleanValue();
+    layer->_layer->_visible = Nan::To<bool>(info[0]).ToChecked();
   }
 
   info.GetReturnValue().Set(Nan::New(layer->_layer->_visible));
@@ -789,7 +789,7 @@ void LayerRef::opacity(const Nan::FunctionCallbackInfo<v8::Value>& info)
   nullcheck(layer->_layer, "layer.opacity");
 
   if (info[0]->IsNumber()) {
-    layer->_layer->setOpacity((float)info[0]->NumberValue());
+    layer->_layer->setOpacity((float)Nan::To<double>(info[0]).ToChecked());
   }
 
   info.GetReturnValue().Set(Nan::New(layer->_layer->getOpacity()));
@@ -801,7 +801,7 @@ void LayerRef::blendMode(const Nan::FunctionCallbackInfo<v8::Value>& info)
   nullcheck(layer->_layer, "layer.blendMode");
 
   if (info[0]->IsInt32()) {
-    layer->_layer->_mode = (Comp::BlendMode)(info[0]->Int32Value());
+    layer->_layer->_mode = (Comp::BlendMode)(Nan::To<int>(info[0]).ToChecked());
   }
 
   info.GetReturnValue().Set(Nan::New(layer->_layer->_mode));
@@ -832,7 +832,7 @@ void LayerRef::getAdjustment(const Nan::FunctionCallbackInfo<v8::Value>& info)
     Nan::ThrowError("getAdjustment expects (int)");
   }
 
-  map<string, float> adj = layer->_layer->getAdjustment((Comp::AdjustmentType)(info[0]->Int32Value()));
+  map<string, float> adj = layer->_layer->getAdjustment((Comp::AdjustmentType)(Nan::To<int>(info[0]).ToChecked()));
 
   // extract all layers into an object (map) and return that
   v8::Local<v8::Object> adjustment = Nan::New<v8::Object>();
@@ -840,7 +840,7 @@ void LayerRef::getAdjustment(const Nan::FunctionCallbackInfo<v8::Value>& info)
 
   for (auto kvp : adj) {
     // create v8 object
-    adjustment->Set(Nan::New(kvp.first).ToLocalChecked(), Nan::New(kvp.second));
+    Nan::Set(adjustment, Nan::New(kvp.first).ToLocalChecked(), Nan::New(kvp.second));
   }
 
   info.GetReturnValue().Set(adjustment);
@@ -855,7 +855,7 @@ void LayerRef::deleteAdjustment(const Nan::FunctionCallbackInfo<v8::Value>& info
     Nan::ThrowError("deleteAdjustment expects (int)");
   }
 
-  layer->_layer->deleteAdjustment((Comp::AdjustmentType)(info[0]->Int32Value()));
+  layer->_layer->deleteAdjustment((Comp::AdjustmentType)(Nan::To<int>(info[0]).ToChecked()));
 }
 
 void LayerRef::deleteAllAdjustments(const Nan::FunctionCallbackInfo<v8::Value>& info)
@@ -875,7 +875,7 @@ void LayerRef::getAdjustments(const Nan::FunctionCallbackInfo<v8::Value>& info)
   v8::Local<v8::Array> ret = Nan::New<v8::Array>();
   int i = 0;
   for (auto t : types) {
-    ret->Set(i, Nan::New((int)t));
+    Nan::Set(ret, i, Nan::New((int)t));
     i++;
   }
 
@@ -891,11 +891,11 @@ void LayerRef::addAdjustment(const Nan::FunctionCallbackInfo<v8::Value>& info)
     Nan::ThrowError("addAdjustment expects (int, string, float)");
   }
 
-  Comp::AdjustmentType type = (Comp::AdjustmentType)info[0]->Int32Value();
-  v8::String::Utf8Value val1(info[1]->ToString());
+  Comp::AdjustmentType type = (Comp::AdjustmentType)Nan::To<int>(info[0]).ToChecked();
+  Nan::Utf8String val1(info[1]);
   string param(*val1);
 
-  layer->_layer->addAdjustment(type, param, (float)info[2]->NumberValue());
+  layer->_layer->addAdjustment(type, param, (float)Nan::To<double>(info[2]).ToChecked());
 }
 
 void LayerRef::addHSLAdjustment(const Nan::FunctionCallbackInfo<v8::Value>& info)
@@ -907,7 +907,7 @@ void LayerRef::addHSLAdjustment(const Nan::FunctionCallbackInfo<v8::Value>& info
     Nan::ThrowError("addHSLAdjustment expects (float, float, float)");
   }
 
-  layer->_layer->addHSLAdjustment((float)info[0]->NumberValue(), (float)info[1]->NumberValue(), (float)info[2]->NumberValue());
+  layer->_layer->addHSLAdjustment((float)Nan::To<double>(info[0]).ToChecked(), (float)Nan::To<double>(info[1]).ToChecked(), (float)Nan::To<double>(info[2]).ToChecked());
 }
 
 void LayerRef::addLevelsAdjustment(const Nan::FunctionCallbackInfo<v8::Value>& info)
@@ -919,11 +919,11 @@ void LayerRef::addLevelsAdjustment(const Nan::FunctionCallbackInfo<v8::Value>& i
     Nan::ThrowError("addHSLAdjustment expects (float, float, [float, float, float])");
   }
 
-  float inMin = (float)info[0]->NumberValue();
-  float inMax = (float)info[1]->NumberValue();
-  float gamma = (info[2]->IsNumber()) ? (float)info[2]->NumberValue() : (1.0f / 10);
-  float outMin = (info[3]->IsNumber()) ? (float)info[3]->NumberValue() : 0;
-  float outMax = (info[4]->IsNumber()) ? (float)info[4]->NumberValue() : 1.0f;
+  float inMin = (float)Nan::To<double>(info[0]).ToChecked();
+  float inMax = (float)Nan::To<double>(info[1]).ToChecked();
+  float gamma = (info[2]->IsNumber()) ? (float)Nan::To<double>(info[2]).ToChecked() : (1.0f / 10);
+  float outMin = (info[3]->IsNumber()) ? (float)Nan::To<double>(info[3]).ToChecked() : 0;
+  float outMax = (info[4]->IsNumber()) ? (float)Nan::To<double>(info[4]).ToChecked() : 1.0f;
 
   layer->_layer->addLevelsAdjustment(inMin, inMax, gamma, outMin, outMax);
 }
@@ -938,15 +938,15 @@ void LayerRef::addCurvesChannel(const Nan::FunctionCallbackInfo<v8::Value>& info
   }
 
   // get channel name
-  v8::String::Utf8Value val0(info[0]->ToString());
+  Nan::Utf8String val0(info[0]);
   string channel(*val0);
 
   // get points, should be an array of objects {x: ###, y: ###}
   vector<Comp::Point> pts;
   v8::Local<v8::Array> args = info[1].As<v8::Array>();
   for (unsigned int i = 0; i < args->Length(); i++) {
-    v8::Local<v8::Object> pt = args->Get(i).As<v8::Object>();
-    pts.push_back(Comp::Point((float)pt->Get(Nan::New("x").ToLocalChecked())->NumberValue(), (float)pt->Get(Nan::New("y").ToLocalChecked())->NumberValue()));
+    v8::Local<v8::Object> pt = Nan::Get(args, i).ToLocalChecked().As<v8::Object>();
+    pts.push_back(Comp::Point((float)Nan::To<double>(Nan::Get(pt, Nan::New("x").ToLocalChecked()).ToLocalChecked()).ToChecked(), (float)Nan::To<double>(Nan::Get(pt, Nan::New("y").ToLocalChecked()).ToLocalChecked()).ToChecked()));
   }
 
   Comp::Curve c(pts);
@@ -963,7 +963,7 @@ void LayerRef::deleteCurvesChannel(const Nan::FunctionCallbackInfo<v8::Value>& i
   }
 
   // get channel name
-  v8::String::Utf8Value val0(info[0]->ToString());
+  Nan::Utf8String val0(info[0]);
   string channel(*val0);
 
   layer->_layer->deleteCurvesChannel(channel);
@@ -978,10 +978,10 @@ void LayerRef::evalCurve(const Nan::FunctionCallbackInfo<v8::Value>& info)
     Nan::ThrowError("evalCurve(string, float) invalid arguments.");
   }
 
-  v8::String::Utf8Value val0(info[0]->ToString());
+  Nan::Utf8String val0(info[0]);
   string channel(*val0);
 
-  info.GetReturnValue().Set(Nan::New(layer->_layer->evalCurve(channel, (float)info[1]->NumberValue())));
+  info.GetReturnValue().Set(Nan::New(layer->_layer->evalCurve(channel, (float)Nan::To<double>(info[1]).ToChecked())));
 }
 
 void LayerRef::getCurve(const Nan::FunctionCallbackInfo<v8::Value>& info)
@@ -994,7 +994,7 @@ void LayerRef::getCurve(const Nan::FunctionCallbackInfo<v8::Value>& info)
   }
 
   // get channel name
-  v8::String::Utf8Value val0(info[0]->ToString());
+  Nan::Utf8String val0(info[0]);
   string channel(*val0);
 
   Comp::Curve c = layer->_layer->getCurveChannel(channel);
@@ -1006,10 +1006,10 @@ void LayerRef::getCurve(const Nan::FunctionCallbackInfo<v8::Value>& info)
 
     // create v8 object
     v8::Local<v8::Object> point = Nan::New<v8::Object>();
-    point->Set(Nan::New("x").ToLocalChecked(), Nan::New(pt._x));
-    point->Set(Nan::New("y").ToLocalChecked(), Nan::New(pt._y));
+    Nan::Set(point, Nan::New("x").ToLocalChecked(), Nan::New(pt._x));
+    Nan::Set(point, Nan::New("y").ToLocalChecked(), Nan::New(pt._y));
 
-    pts->Set(Nan::New(i), point);
+    Nan::Set(pts, Nan::New(i), point);
   }
 
   info.GetReturnValue().Set(pts);
@@ -1024,7 +1024,7 @@ void LayerRef::addExposureAdjustment(const Nan::FunctionCallbackInfo<v8::Value>&
     Nan::ThrowError("addExposureAdjustment(float, float, float) invalid arguments.");
   }
 
-  layer->_layer->addExposureAdjustment((float)info[0]->NumberValue(), (float)info[1]->NumberValue(), (float)info[2]->NumberValue());
+  layer->_layer->addExposureAdjustment((float)Nan::To<double>(info[0]).ToChecked(), (float)Nan::To<double>(info[1]).ToChecked(), (float)Nan::To<double>(info[2]).ToChecked());
 }
 
 void LayerRef::addGradient(const Nan::FunctionCallbackInfo<v8::Value>& info)
@@ -1040,18 +1040,18 @@ void LayerRef::addGradient(const Nan::FunctionCallbackInfo<v8::Value>& info)
   vector<float> pts;
   vector<Comp::RGBColor> colors;
 
-  if (args->Get(0)->IsObject()) {
+  if (Nan::Get(args, 0).ToLocalChecked()->IsObject()) {
     // object with {r, g, b, x} fields
     for (unsigned int i = 0; i < args->Length(); i++) {
-      v8::Local<v8::Object> co = args->Get(i).As<v8::Object>();
+      v8::Local<v8::Object> co = Nan::Get(args, i).ToLocalChecked().As<v8::Object>();
       Comp::RGBColor color;
-      v8::Local<v8::Object> clr = co->Get(Nan::New("color").ToLocalChecked()).As<v8::Object>();
+      v8::Local<v8::Object> clr = Nan::Get(co, Nan::New("color").ToLocalChecked()).ToLocalChecked().As<v8::Object>();
 
-      color._r = (float)clr->Get(Nan::New("r").ToLocalChecked())->NumberValue();
-      color._g = (float)clr->Get(Nan::New("g").ToLocalChecked())->NumberValue();
-      color._b = (float)clr->Get(Nan::New("b").ToLocalChecked())->NumberValue();
+      color._r = (float)Nan::To<double>(Nan::Get(clr, Nan::New("r").ToLocalChecked()).ToLocalChecked()).ToChecked();
+      color._g = (float)Nan::To<double>(Nan::Get(clr, Nan::New("g").ToLocalChecked()).ToLocalChecked()).ToChecked();
+      color._b = (float)Nan::To<double>(Nan::Get(clr, Nan::New("b").ToLocalChecked()).ToLocalChecked()).ToChecked();
 
-      pts.push_back((float)co->Get(Nan::New("x").ToLocalChecked())->NumberValue());
+      pts.push_back((float)Nan::To<double>(Nan::Get(co, Nan::New("x").ToLocalChecked()).ToLocalChecked()).ToChecked());
       colors.push_back(color);
     }
   }
@@ -1059,17 +1059,17 @@ void LayerRef::addGradient(const Nan::FunctionCallbackInfo<v8::Value>& info)
     // separate arrays
     // get point locations, just a plain array
     for (unsigned int i = 0; i < args->Length(); i++) {
-      pts.push_back((float)args->Get(i)->NumberValue());
+      pts.push_back((float)Nan::To<double>(Nan::Get(args, i).ToLocalChecked()).ToChecked());
     }
 
     // get colors, an array of objects {r, g, b}
     v8::Local<v8::Array> c = info[1].As<v8::Array>();
     for (unsigned int i = 0; i < c->Length(); i++) {
-      v8::Local<v8::Object> co = c->Get(i).As<v8::Object>();
+      v8::Local<v8::Object> co = Nan::Get(c, i).ToLocalChecked().As<v8::Object>();
       Comp::RGBColor color;
-      color._r = (float)co->Get(Nan::New("r").ToLocalChecked())->NumberValue();
-      color._g = (float)co->Get(Nan::New("g").ToLocalChecked())->NumberValue();
-      color._b = (float)co->Get(Nan::New("b").ToLocalChecked())->NumberValue();
+      color._r = (float)Nan::To<double>(Nan::Get(co, Nan::New("r").ToLocalChecked()).ToLocalChecked()).ToChecked();
+      color._g = (float)Nan::To<double>(Nan::Get(co, Nan::New("g").ToLocalChecked()).ToLocalChecked()).ToChecked();
+      color._b = (float)Nan::To<double>(Nan::Get(co, Nan::New("b").ToLocalChecked()).ToLocalChecked()).ToChecked();
 
       colors.push_back(color);
     }
@@ -1087,11 +1087,11 @@ void LayerRef::evalGradient(const Nan::FunctionCallbackInfo<v8::Value>& info)
     Nan::ThrowError("evalGradient(float) invalid arguments.");
   }
 
-  Comp::RGBColor res = layer->_layer->evalGradient((float)info[0]->NumberValue());
+  Comp::RGBColor res = layer->_layer->evalGradient((float)Nan::To<double>(info[0]).ToChecked());
   v8::Local<v8::Object> rgb = Nan::New<v8::Object>();
-  rgb->Set(Nan::New("r").ToLocalChecked(), Nan::New(res._r));
-  rgb->Set(Nan::New("g").ToLocalChecked(), Nan::New(res._g));
-  rgb->Set(Nan::New("b").ToLocalChecked(), Nan::New(res._b));
+  Nan::Set(rgb, Nan::New("r").ToLocalChecked(), Nan::New(res._r));
+  Nan::Set(rgb, Nan::New("g").ToLocalChecked(), Nan::New(res._g));
+  Nan::Set(rgb, Nan::New("b").ToLocalChecked(), Nan::New(res._b));
 
   info.GetReturnValue().Set(rgb);
 }
@@ -1107,15 +1107,15 @@ void LayerRef::getGradient(const Nan::FunctionCallbackInfo<v8::Value>& info)
   for (int i = 0; i < g._x.size(); i++) {
     // construct object
     v8::Local<v8::Object> pt = Nan::New<v8::Object>();
-    pt->Set(Nan::New("x").ToLocalChecked(), Nan::New(g._x[i]));
+    Nan::Set(pt, Nan::New("x").ToLocalChecked(), Nan::New(g._x[i]));
 
     v8::Local<v8::Object> color = Nan::New<v8::Object>();
-    color->Set(Nan::New("r").ToLocalChecked(), Nan::New(g._colors[i]._r));
-    color->Set(Nan::New("g").ToLocalChecked(), Nan::New(g._colors[i]._g));
-    color->Set(Nan::New("b").ToLocalChecked(), Nan::New(g._colors[i]._b));
+    Nan::Set(color, Nan::New("r").ToLocalChecked(), Nan::New(g._colors[i]._r));
+    Nan::Set(color, Nan::New("g").ToLocalChecked(), Nan::New(g._colors[i]._g));
+    Nan::Set(color, Nan::New("b").ToLocalChecked(), Nan::New(g._colors[i]._b));
 
-    pt->Set(Nan::New("color").ToLocalChecked(), color);
-    grad->Set(Nan::New(i), pt);
+    Nan::Set(pt, Nan::New("color").ToLocalChecked(), color);
+    Nan::Set(grad, Nan::New(i), pt);
   }
 
   info.GetReturnValue().Set(grad);
@@ -1135,12 +1135,12 @@ void LayerRef::selectiveColor(const Nan::FunctionCallbackInfo<v8::Value>& info)
     for (auto c : sc) {
       v8::Local<v8::Object> color = Nan::New<v8::Object>();
       for (auto cp : c.second) {
-        color->Set(Nan::New(cp.first).ToLocalChecked(), Nan::New(cp.second));
+        Nan::Set(color, Nan::New(cp.first).ToLocalChecked(), Nan::New(cp.second));
       }
-      ret->Set(Nan::New(c.first).ToLocalChecked(), color);
+      Nan::Set(ret, Nan::New(c.first).ToLocalChecked(), color);
     }
 
-    ret->Set(Nan::New("relative").ToLocalChecked(), Nan::New(layer->_layer->getAdjustment(Comp::AdjustmentType::SELECTIVE_COLOR)["relative"]));
+    Nan::Set(ret, Nan::New("relative").ToLocalChecked(), Nan::New(layer->_layer->getAdjustment(Comp::AdjustmentType::SELECTIVE_COLOR)["relative"]));
     info.GetReturnValue().Set(ret);
   }
   else {
@@ -1152,25 +1152,25 @@ void LayerRef::selectiveColor(const Nan::FunctionCallbackInfo<v8::Value>& info)
     }
 
     v8::Local<v8::Object> ret = info[1].As<v8::Object>();
-    auto names = ret->GetOwnPropertyNames();
+    auto names = Nan::GetOwnPropertyNames(ret).ToLocalChecked();
     for (unsigned int i = 0; i < names->Length(); i++) {
-      v8::Local<v8::Object> color = ret->Get(names->Get(i)).As<v8::Object>();
-      v8::Local<v8::Array> colorNames = color->GetOwnPropertyNames();
+      v8::Local<v8::Object> color = Nan::Get(ret, Nan::Get(names, i).ToLocalChecked()).ToLocalChecked().As<v8::Object>();
+      v8::Local<v8::Array> colorNames = Nan::GetOwnPropertyNames(color).ToLocalChecked();
 
-      v8::String::Utf8Value o1(names->Get(i)->ToString());
+      Nan::Utf8String o1(Nan::Get(names, i).ToLocalChecked());
       string group(*o1);
 
       for (unsigned int j = 0; j < colorNames->Length(); j++) {
-        v8::Local<v8::Value> colorVal = color->Get(colorNames->Get(j));
+        v8::Local<v8::Value> colorVal = Nan::Get(color, Nan::Get(colorNames, j).ToLocalChecked()).ToLocalChecked();
 
-        v8::String::Utf8Value o2(colorNames->Get(j)->ToString());
+        Nan::Utf8String o2(Nan::Get(colorNames, j).ToLocalChecked());
         string propName(*o2);
 
-        sc[group][propName] = (float)colorVal->NumberValue();
+        sc[group][propName] = (float)Nan::To<double>(colorVal).ToChecked();
       }
     }
 
-    layer->_layer->addSelectiveColorAdjustment(info[0]->BooleanValue(), sc);
+    layer->_layer->addSelectiveColorAdjustment(Nan::To<bool>(info[0]).ToChecked(), sc);
   }
 }
 
@@ -1184,10 +1184,10 @@ void LayerRef::selectiveColorChannel(const Nan::FunctionCallbackInfo<v8::Value>&
       Nan::ThrowError("selectiveColorChannel(string, string) invalid arguments");
     }
 
-    v8::String::Utf8Value o1(info[0]->ToString());
+    Nan::Utf8String o1(info[0]);
     string channel(*o1);
 
-    v8::String::Utf8Value o2(info[1]->ToString());
+    Nan::Utf8String o2(info[1]);
     string param(*o2);
 
     info.GetReturnValue().Set(Nan::New(layer->_layer->getSelectiveColorChannel(channel, param)));
@@ -1197,13 +1197,13 @@ void LayerRef::selectiveColorChannel(const Nan::FunctionCallbackInfo<v8::Value>&
       Nan::ThrowError("selectiveColorChannel(string, string, float) invalid arugments");
     }
 
-    v8::String::Utf8Value o1(info[0]->ToString());
+    Nan::Utf8String o1(info[0]);
     string channel(*o1);
 
-    v8::String::Utf8Value o2(info[1]->ToString());
+    Nan::Utf8String o2(info[1]);
     string param(*o2);
 
-    layer->_layer->setSelectiveColorChannel(channel, param, (float)info[2]->NumberValue());
+    layer->_layer->setSelectiveColorChannel(channel, param, (float)Nan::To<double>(info[2]).ToChecked());
   }
   else {
     Nan::ThrowError("selectiveColorChannel invalid number of arguments");
@@ -1222,24 +1222,24 @@ void LayerRef::colorBalance(const Nan::FunctionCallbackInfo<v8::Value>& info)
     map<string, float> adj = layer->_layer->getAdjustment(Comp::AdjustmentType::COLOR_BALANCE);
 
     v8::Local<v8::Object> shadow;
-    shadow->Set(Nan::New("r").ToLocalChecked(), Nan::New(adj["shadowR"]));
-    shadow->Set(Nan::New("g").ToLocalChecked(), Nan::New(adj["shadowG"]));
-    shadow->Set(Nan::New("b").ToLocalChecked(), Nan::New(adj["shadowB"]));
-    ret->Set(Nan::New("shadow").ToLocalChecked(), shadow);
+    Nan::Set(shadow, Nan::New("r").ToLocalChecked(), Nan::New(adj["shadowR"]));
+    Nan::Set(shadow, Nan::New("g").ToLocalChecked(), Nan::New(adj["shadowG"]));
+    Nan::Set(shadow, Nan::New("b").ToLocalChecked(), Nan::New(adj["shadowB"]));
+    Nan::Set(ret, Nan::New("shadow").ToLocalChecked(), shadow);
 
     v8::Local<v8::Object> mid;
-    mid->Set(Nan::New("r").ToLocalChecked(), Nan::New(adj["midR"]));
-    mid->Set(Nan::New("g").ToLocalChecked(), Nan::New(adj["midG"]));
-    mid->Set(Nan::New("b").ToLocalChecked(), Nan::New(adj["midB"]));
-    ret->Set(Nan::New("mid").ToLocalChecked(), mid);
+    Nan::Set(mid, Nan::New("r").ToLocalChecked(), Nan::New(adj["midR"]));
+    Nan::Set(mid, Nan::New("g").ToLocalChecked(), Nan::New(adj["midG"]));
+    Nan::Set(mid, Nan::New("b").ToLocalChecked(), Nan::New(adj["midB"]));
+    Nan::Set(ret, Nan::New("mid").ToLocalChecked(), mid);
 
     v8::Local<v8::Object> high;
-    high->Set(Nan::New("r").ToLocalChecked(), Nan::New(adj["highR"]));
-    high->Set(Nan::New("g").ToLocalChecked(), Nan::New(adj["highG"]));
-    high->Set(Nan::New("b").ToLocalChecked(), Nan::New(adj["highB"]));
-    ret->Set(Nan::New("high").ToLocalChecked(), high);
+    Nan::Set(high, Nan::New("r").ToLocalChecked(), Nan::New(adj["highR"]));
+    Nan::Set(high, Nan::New("g").ToLocalChecked(), Nan::New(adj["highG"]));
+    Nan::Set(high, Nan::New("b").ToLocalChecked(), Nan::New(adj["highB"]));
+    Nan::Set(ret, Nan::New("high").ToLocalChecked(), high);
 
-    ret->Set(Nan::New("preserveLuma").ToLocalChecked(), Nan::New(adj["preserveLuma"]));
+    Nan::Set(ret, Nan::New("preserveLuma").ToLocalChecked(), Nan::New(adj["preserveLuma"]));
 
     info.GetReturnValue().Set(ret);
   }
@@ -1256,9 +1256,9 @@ void LayerRef::colorBalance(const Nan::FunctionCallbackInfo<v8::Value>& info)
     }
 
     // just call the function
-    layer->_layer->addColorBalanceAdjustment(info[0]->BooleanValue(), (float)info[1]->NumberValue(), (float)info[2]->NumberValue(), (float)info[3]->NumberValue(),
-      (float)info[4]->NumberValue(), (float)info[5]->NumberValue(), (float)info[6]->NumberValue(),
-      (float)info[7]->NumberValue(), (float)info[8]->NumberValue(), (float)info[9]->NumberValue());
+    layer->_layer->addColorBalanceAdjustment(Nan::To<bool>(info[0]).ToChecked(), (float)Nan::To<double>(info[1]).ToChecked(), (float)Nan::To<double>(info[2]).ToChecked(), (float)Nan::To<double>(info[3]).ToChecked(),
+      (float)Nan::To<double>(info[4]).ToChecked(), (float)Nan::To<double>(info[5]).ToChecked(), (float)Nan::To<double>(info[6]).ToChecked(),
+      (float)Nan::To<double>(info[7]).ToChecked(), (float)Nan::To<double>(info[8]).ToChecked(), (float)Nan::To<double>(info[9]).ToChecked());
   }
 }
 
@@ -1276,31 +1276,31 @@ void LayerRef::addPhotoFilter(const Nan::FunctionCallbackInfo<v8::Value>& info)
   }
 
   v8::Local<v8::Object> color = info[0].As<v8::Object>();
-  bool preserveLuma = color->Get(Nan::New("preserveLuma").ToLocalChecked())->BooleanValue();
-  float density = (float)color->Get(Nan::New("density").ToLocalChecked())->NumberValue();
+  bool preserveLuma = Nan::To<bool>(Nan::Get(color, Nan::New("preserveLuma").ToLocalChecked()).ToLocalChecked()).ToChecked();
+  float density = (float)Nan::To<double>(Nan::Get(color, Nan::New("density").ToLocalChecked()).ToLocalChecked()).ToChecked();
   
   if (Nan::Has(color, Nan::New("luminance").ToLocalChecked()).ToChecked()) {
     // convert from lab to rgb
-    Comp::Utils<float>::RGBColorT rgb = Comp::Utils<float>::LabToRGB((float)color->Get(Nan::New("luminance").ToLocalChecked())->NumberValue(),
-      (float)color->Get(Nan::New("a").ToLocalChecked())->NumberValue(),
-      (float)color->Get(Nan::New("b").ToLocalChecked())->NumberValue());
+    Comp::Utils<float>::RGBColorT rgb = Comp::Utils<float>::LabToRGB((float)Nan::To<double>(Nan::Get(color, Nan::New("luminance").ToLocalChecked()).ToLocalChecked()).ToChecked(),
+      (float)Nan::To<double>(Nan::Get(color, Nan::New("a").ToLocalChecked()).ToLocalChecked()).ToChecked(),
+      (float)Nan::To<double>(Nan::Get(color, Nan::New("b").ToLocalChecked()).ToLocalChecked()).ToChecked());
 
     layer->_layer->addPhotoFilterAdjustment(preserveLuma, rgb._r, rgb._g, rgb._b, density);
   }
   else if (Nan::Has(color, Nan::New("hue").ToLocalChecked()).ToChecked()) {
     // convert from hsl to rgb
-    Comp::Utils<float>::RGBColorT rgb = Comp::Utils<float>::HSLToRGB((float)color->Get(Nan::New("hue").ToLocalChecked())->NumberValue(),
-      (float)color->Get(Nan::New("saturation").ToLocalChecked())->NumberValue(),
-      (float)color->Get(Nan::New("brightness").ToLocalChecked())->NumberValue());
+    Comp::Utils<float>::RGBColorT rgb = Comp::Utils<float>::HSLToRGB((float)Nan::To<double>(Nan::Get(color, Nan::New("hue").ToLocalChecked()).ToLocalChecked()).ToChecked(),
+      (float)Nan::To<double>(Nan::Get(color, Nan::New("saturation").ToLocalChecked()).ToLocalChecked()).ToChecked(),
+      (float)Nan::To<double>(Nan::Get(color, Nan::New("brightness").ToLocalChecked()).ToLocalChecked()).ToChecked());
 
     layer->_layer->addPhotoFilterAdjustment(preserveLuma, rgb._r, rgb._g, rgb._b, density);
   }
   else if (Nan::Has(color, Nan::New("r").ToLocalChecked()).ToChecked()) {
     // just do the thing
 
-    layer->_layer->addPhotoFilterAdjustment(preserveLuma, (float)color->Get(Nan::New("r").ToLocalChecked())->NumberValue(),
-      (float)color->Get(Nan::New("g").ToLocalChecked())->NumberValue(),
-      (float)color->Get(Nan::New("b").ToLocalChecked())->NumberValue(),
+    layer->_layer->addPhotoFilterAdjustment(preserveLuma, (float)Nan::To<double>(Nan::Get(color, Nan::New("r").ToLocalChecked()).ToLocalChecked()).ToChecked(),
+      (float)Nan::To<double>(Nan::Get(color, Nan::New("g").ToLocalChecked()).ToLocalChecked()).ToChecked(),
+      (float)Nan::To<double>(Nan::Get(color, Nan::New("b").ToLocalChecked()).ToLocalChecked()).ToChecked(),
       density);
   }
   else {
@@ -1319,10 +1319,10 @@ void LayerRef::colorize(const Nan::FunctionCallbackInfo<v8::Value>& info)
     v8::Local<v8::Object> ret = Nan::New<v8::Object>();
 
     map<string, float> adj = layer->_layer->getAdjustment(Comp::AdjustmentType::COLORIZE);
-    ret->Set(Nan::New("r").ToLocalChecked(), Nan::New(adj["r"]));
-    ret->Set(Nan::New("g").ToLocalChecked(), Nan::New(adj["g"]));
-    ret->Set(Nan::New("b").ToLocalChecked(), Nan::New(adj["b"]));
-    ret->Set(Nan::New("a").ToLocalChecked(), Nan::New(adj["a"]));
+    Nan::Set(ret, Nan::New("r").ToLocalChecked(), Nan::New(adj["r"]));
+    Nan::Set(ret, Nan::New("g").ToLocalChecked(), Nan::New(adj["g"]));
+    Nan::Set(ret, Nan::New("b").ToLocalChecked(), Nan::New(adj["b"]));
+    Nan::Set(ret, Nan::New("a").ToLocalChecked(), Nan::New(adj["a"]));
 
     info.GetReturnValue().Set(ret);
   }
@@ -1332,8 +1332,8 @@ void LayerRef::colorize(const Nan::FunctionCallbackInfo<v8::Value>& info)
     }
 
     // set value
-    layer->_layer->addColorAdjustment((float)info[0]->NumberValue(), (float)info[1]->NumberValue(),
-      (float)info[2]->NumberValue(), (float)info[3]->NumberValue());
+    layer->_layer->addColorAdjustment((float)Nan::To<double>(info[0]).ToChecked(), (float)Nan::To<double>(info[1]).ToChecked(),
+      (float)Nan::To<double>(info[2]).ToChecked(), (float)Nan::To<double>(info[3]).ToChecked());
   }
 }
 
@@ -1348,10 +1348,10 @@ void LayerRef::lighterColorize(const Nan::FunctionCallbackInfo<v8::Value>& info)
     v8::Local<v8::Object> ret = Nan::New<v8::Object>();
 
     map<string, float> adj = layer->_layer->getAdjustment(Comp::AdjustmentType::LIGHTER_COLORIZE);
-    ret->Set(Nan::New("r").ToLocalChecked(), Nan::New(adj["r"]));
-    ret->Set(Nan::New("g").ToLocalChecked(), Nan::New(adj["g"]));
-    ret->Set(Nan::New("b").ToLocalChecked(), Nan::New(adj["b"]));
-    ret->Set(Nan::New("a").ToLocalChecked(), Nan::New(adj["a"]));
+    Nan::Set(ret, Nan::New("r").ToLocalChecked(), Nan::New(adj["r"]));
+    Nan::Set(ret, Nan::New("g").ToLocalChecked(), Nan::New(adj["g"]));
+    Nan::Set(ret, Nan::New("b").ToLocalChecked(), Nan::New(adj["b"]));
+    Nan::Set(ret, Nan::New("a").ToLocalChecked(), Nan::New(adj["a"]));
 
     info.GetReturnValue().Set(ret);
   }
@@ -1361,8 +1361,8 @@ void LayerRef::lighterColorize(const Nan::FunctionCallbackInfo<v8::Value>& info)
     }
 
     // set value
-    layer->_layer->addLighterColorAdjustment((float)info[0]->NumberValue(), (float)info[1]->NumberValue(),
-      (float)info[2]->NumberValue(), (float)info[3]->NumberValue());
+    layer->_layer->addLighterColorAdjustment((float)Nan::To<double>(info[0]).ToChecked(), (float)Nan::To<double>(info[1]).ToChecked(),
+      (float)Nan::To<double>(info[2]).ToChecked(), (float)Nan::To<double>(info[3]).ToChecked());
   }
 }
 
@@ -1377,10 +1377,10 @@ void LayerRef::overwriteColor(const Nan::FunctionCallbackInfo<v8::Value>& info)
     v8::Local<v8::Object> ret = Nan::New<v8::Object>();
 
     map<string, float> adj = layer->_layer->getAdjustment(Comp::AdjustmentType::OVERWRITE_COLOR);
-    ret->Set(Nan::New("r").ToLocalChecked(), Nan::New(adj["r"]));
-    ret->Set(Nan::New("g").ToLocalChecked(), Nan::New(adj["g"]));
-    ret->Set(Nan::New("b").ToLocalChecked(), Nan::New(adj["b"]));
-    ret->Set(Nan::New("a").ToLocalChecked(), Nan::New(adj["a"]));
+    Nan::Set(ret, Nan::New("r").ToLocalChecked(), Nan::New(adj["r"]));
+    Nan::Set(ret, Nan::New("g").ToLocalChecked(), Nan::New(adj["g"]));
+    Nan::Set(ret, Nan::New("b").ToLocalChecked(), Nan::New(adj["b"]));
+    Nan::Set(ret, Nan::New("a").ToLocalChecked(), Nan::New(adj["a"]));
 
     info.GetReturnValue().Set(ret);
   }
@@ -1390,8 +1390,8 @@ void LayerRef::overwriteColor(const Nan::FunctionCallbackInfo<v8::Value>& info)
     }
 
     // set value
-    layer->_layer->addOverwriteColorAdjustment((float)info[0]->NumberValue(), (float)info[1]->NumberValue(),
-      (float)info[2]->NumberValue(), (float)info[3]->NumberValue());
+    layer->_layer->addOverwriteColorAdjustment((float)Nan::To<double>(info[0]).ToChecked(), (float)Nan::To<double>(info[1]).ToChecked(),
+      (float)Nan::To<double>(info[2]).ToChecked(), (float)Nan::To<double>(info[3]).ToChecked());
   }
 }
 
@@ -1414,8 +1414,8 @@ void LayerRef::brightnessContrast(const Nan::FunctionCallbackInfo<v8::Value>& in
     v8::Local<v8::Object> ret = Nan::New<v8::Object>();
 
     map<string, float> adj = layer->_layer->getAdjustment(Comp::AdjustmentType::BRIGHTNESS);
-    ret->Set(Nan::New("brightness").ToLocalChecked(), Nan::New(adj["brightness"]));
-    ret->Set(Nan::New("contrast").ToLocalChecked(), Nan::New(adj["contrast"]));
+    Nan::Set(ret, Nan::New("brightness").ToLocalChecked(), Nan::New(adj["brightness"]));
+    Nan::Set(ret, Nan::New("contrast").ToLocalChecked(), Nan::New(adj["contrast"]));
 
     info.GetReturnValue().Set(ret);
   }
@@ -1425,7 +1425,7 @@ void LayerRef::brightnessContrast(const Nan::FunctionCallbackInfo<v8::Value>& in
     }
 
     // set value
-    layer->_layer->addBrightnessAdjustment((float)info[0]->NumberValue(), (float)info[1]->NumberValue());
+    layer->_layer->addBrightnessAdjustment((float)Nan::To<double>(info[0]).ToChecked(), (float)Nan::To<double>(info[1]).ToChecked());
   }
 }
 
@@ -1444,7 +1444,7 @@ void LayerRef::type(const Nan::FunctionCallbackInfo<v8::Value>& info)
   nullcheck(layer->_layer, "layer.type");
 
   if (info[0]->IsString()) {
-    v8::String::Utf8Value o1(info[0]->ToString());
+    Nan::Utf8String o1(info[0]);
     string type(*o1);
     layer->_layer->_psType = type;
   }
@@ -1461,31 +1461,31 @@ void LayerRef::conditionalBlend(const Nan::FunctionCallbackInfo<v8::Value>& info
     // return info
     v8::Local<v8::Object> ret = Nan::New<v8::Object>();
 
-    ret->Set(Nan::New("channel").ToLocalChecked(), Nan::New(layer->_layer->getConditionalBlendChannel()).ToLocalChecked());
+    Nan::Set(ret, Nan::New("channel").ToLocalChecked(), Nan::New(layer->_layer->getConditionalBlendChannel()).ToLocalChecked());
 
     v8::Local<v8::Object> params = Nan::New<v8::Object>();
     for (auto& param : layer->_layer->getConditionalBlendSettings()) {
-      params->Set(Nan::New(param.first).ToLocalChecked(), Nan::New(param.second));
+      Nan::Set(params, Nan::New(param.first).ToLocalChecked(), Nan::New(param.second));
     }
 
-    ret->Set(Nan::New("params").ToLocalChecked(), params);
+    Nan::Set(ret, Nan::New("params").ToLocalChecked(), params);
 
     info.GetReturnValue().Set(ret);
   }
   else {
     if (info[0]->IsString() && info[1]->IsObject()) {
-      v8::String::Utf8Value i0(info[0]->ToString());
+      Nan::Utf8String i0(info[0]);
       string channel(*i0);
 
       v8::Local<v8::Object> ret = info[1].As<v8::Object>();
-      auto params = ret->GetOwnPropertyNames();
+      auto params = Nan::GetOwnPropertyNames(ret).ToLocalChecked();
 
       map<string, float> cbParams;
 
       for (unsigned int i = 0; i < params->Length(); i++) {
-        float val = ret->Get(params->Get(i))->NumberValue();
+        float val = (float)Nan::To<double>(Nan::Get(ret, Nan::Get(params, i).ToLocalChecked()).ToLocalChecked()).ToChecked();
 
-        v8::String::Utf8Value o1(params->Get(i)->ToString());
+        Nan::Utf8String o1(Nan::Get(params, i).ToLocalChecked());
         string param(*o1);
 
         cbParams[param] = val;
@@ -1521,13 +1521,13 @@ void LayerRef::offset(const Nan::FunctionCallbackInfo<v8::Value>& info)
   nullcheck(layer->_layer, "layer.offset");
 
   if (info[0]->IsNumber() && info[1]->IsNumber()) {
-    layer->_layer->setOffset(info[0]->NumberValue(), info[1]->NumberValue());
+    layer->_layer->setOffset(Nan::To<double>(info[0]).ToChecked(), Nan::To<double>(info[1]).ToChecked());
   }
   else {
     auto offset = layer->_layer->getOffset();
     v8::Local<v8::Object> ret = Nan::New<v8::Object>();
-    ret->Set(Nan::New("x").ToLocalChecked(), Nan::New(offset.first));
-    ret->Set(Nan::New("y").ToLocalChecked(), Nan::New(offset.second));
+    Nan::Set(ret, Nan::New("x").ToLocalChecked(), Nan::New(offset.first));
+    Nan::Set(ret, Nan::New("y").ToLocalChecked(), Nan::New(offset.second));
 
     info.GetReturnValue().Set(ret);
   }
@@ -1541,8 +1541,8 @@ void LayerRef::setPrecompOrder(const Nan::FunctionCallbackInfo<v8::Value>& info)
   if (info[0]->IsArray()) {
     v8::Local<v8::Array> arr = info[0].As<v8::Array>();
     vector<string> order;
-    for (int i = 0; i < arr->Length(); i++) {
-      v8::String::Utf8Value str(arr->Get(i)->ToString());
+    for (unsigned int i = 0; i < arr->Length(); i++) {
+      Nan::Utf8String str(Nan::Get(arr, i).ToLocalChecked());
       order.push_back(string(*str));
     }
 
@@ -1562,7 +1562,7 @@ void LayerRef::getPrecompOrder(const Nan::FunctionCallbackInfo<v8::Value>& info)
   vector<string> order = layer->_layer->getPrecompOrder();
 
   for (int i = 0; i < order.size(); i++) {
-    ret->Set(i, Nan::New(order[i]).ToLocalChecked());
+    Nan::Set(ret, i, Nan::New(order[i]).ToLocalChecked());
   }
 
   info.GetReturnValue().Set(ret);
@@ -1590,8 +1590,8 @@ void ContextWrapper::Init(v8::Local<v8::Object> exports)
   Nan::SetPrototypeMethod(tpl, "layerVector", layerVector);
   Nan::SetPrototypeMethod(tpl, "layerKey", layerKey);
 
-  contextConstructor.Reset(tpl->GetFunction());
-  exports->Set(Nan::New("Context").ToLocalChecked(), tpl->GetFunction());
+  contextConstructor.Reset(Nan::GetFunction(tpl).ToLocalChecked());
+  Nan::Set(exports, Nan::New("Context").ToLocalChecked(), Nan::GetFunction(tpl).ToLocalChecked());
 }
 
 ContextWrapper::ContextWrapper(Comp::Context ctx) : _context(ctx)
@@ -1624,7 +1624,7 @@ void ContextWrapper::getLayer(const Nan::FunctionCallbackInfo<v8::Value>& info)
   ContextWrapper* c = ObjectWrap::Unwrap<ContextWrapper>(info.Holder());
   nullcheck(c, "ContextWrapper.getLayer");
 
-  v8::String::Utf8Value val0(info[0]->ToString());
+  Nan::Utf8String val0(info[0]);
   string name(*val0);
 
   if (c->_context.count(name) > 0) {
@@ -1650,7 +1650,7 @@ void ContextWrapper::keys(const Nan::FunctionCallbackInfo<v8::Value>& info)
 
   int i = 0;
   for (auto k : c->_context) {
-    keys->Set(i, Nan::New<v8::String>(k.first).ToLocalChecked());
+    Nan::Set(keys, i, Nan::New<v8::String>(k.first).ToLocalChecked());
     i++;
   }
 
@@ -1677,7 +1677,7 @@ void ContextWrapper::layerVector(const Nan::FunctionCallbackInfo<v8::Value>& inf
 
   v8::Local<v8::Array> vals = Nan::New<v8::Array>();
   for (int i = 0; i < layerData.size(); i++) {
-    vals->Set(i, Nan::New(layerData[i]));
+    Nan::Set(vals, i, Nan::New(layerData[i]));
   }
 
   info.GetReturnValue().Set(vals);
@@ -1800,8 +1800,8 @@ void CompositorWrapper::Init(v8::Local<v8::Object> exports)
   Nan::SetPrototypeMethod(tpl, "renderOnlyLayer", renderOnlyLayer);
   Nan::SetPrototypeMethod(tpl, "isLayer", isLayer);
 
-  compositorConstructor.Reset(tpl->GetFunction());
-  exports->Set(Nan::New("Compositor").ToLocalChecked(), tpl->GetFunction());
+  compositorConstructor.Reset(Nan::GetFunction(tpl).ToLocalChecked());
+  Nan::Set(exports, Nan::New("Compositor").ToLocalChecked(), Nan::GetFunction(tpl).ToLocalChecked());
 }
 
 CompositorWrapper::CompositorWrapper()
@@ -1818,8 +1818,8 @@ void CompositorWrapper::New(const Nan::FunctionCallbackInfo<v8::Value>& info)
   // initialization might be from a file or from nothing
   CompositorWrapper* cw = new CompositorWrapper();
   if (info.Length() == 2) {
-    v8::String::Utf8Value file(info[0]->ToString());
-    v8::String::Utf8Value dir(info[1]->ToString());
+    Nan::Utf8String file(info[0]);
+    Nan::Utf8String dir(info[1]);
 
     cw->_compositor = new Comp::Compositor(string(*file), string(*dir));
   }
@@ -1843,7 +1843,7 @@ void CompositorWrapper::getLayer(const Nan::FunctionCallbackInfo<v8::Value>& inf
   CompositorWrapper* c = ObjectWrap::Unwrap<CompositorWrapper>(info.Holder());
   nullcheck(c->_compositor, "compositor.getLayer");
 
-  v8::String::Utf8Value val0(info[0]->ToString());
+  Nan::Utf8String val0(info[0]);
   string name(*val0);
 
   Comp::Layer& l = c->_compositor->getLayer(name);
@@ -1861,7 +1861,7 @@ void CompositorWrapper::isLayer(const Nan::FunctionCallbackInfo<v8::Value>& info
   nullcheck(c->_compositor, "compositor.addLayer");
 
   if (info[0]->IsString()) {
-    v8::String::Utf8Value i0(info[0]->ToString());
+    Nan::Utf8String i0(info[0]);
     info.GetReturnValue().Set(Nan::New(c->_compositor->getPrimaryContext().count(string(*i0)) > 0));
   }
   else {
@@ -1879,11 +1879,11 @@ void CompositorWrapper::addLayer(const Nan::FunctionCallbackInfo<v8::Value>& inf
   nullcheck(c->_compositor, "compositor.addLayer");
 
   bool result;
-  v8::String::Utf8Value val0(info[0]->ToString());
+  Nan::Utf8String val0(info[0]);
   string name(*val0);
 
   if (info.Length() == 2) {
-    v8::String::Utf8Value val1(info[1]->ToString());
+    Nan::Utf8String val1(info[1]);
     string path(*val1);
 
     result = c->_compositor->addLayer(name, path);
@@ -1906,10 +1906,10 @@ void CompositorWrapper::addBase64Layer(const Nan::FunctionCallbackInfo<v8::Value
   nullcheck(c->_compositor, "compositor.addBase64Layer");
 
   bool result;
-  v8::String::Utf8Value val0(info[0]->ToString());
+  Nan::Utf8String val0(info[0]);
   string name(*val0);
 
-  v8::String::Utf8Value val1(info[1]->ToString());
+  Nan::Utf8String val1(info[1]);
   string base64(*val1);
 
   Comp::Image img(info[2]->Int32Value(), info[3]->Int32Value(), base64);
@@ -1928,10 +1928,10 @@ void CompositorWrapper::copyLayer(const Nan::FunctionCallbackInfo<v8::Value>& in
   CompositorWrapper* c = ObjectWrap::Unwrap<CompositorWrapper>(info.Holder());
   nullcheck(c->_compositor, "compositor.copyLayer");
 
-  v8::String::Utf8Value val0(info[0]->ToString());
+  Nan::Utf8String val0(info[0]);
   string name(*val0);
 
-  v8::String::Utf8Value val1(info[1]->ToString());
+  Nan::Utf8String val1(info[1]);
   string dest(*val1);
 
   bool result = c->_compositor->copyLayer(name, dest);
@@ -1948,7 +1948,7 @@ void CompositorWrapper::deleteLayer(const Nan::FunctionCallbackInfo<v8::Value>& 
   CompositorWrapper* c = ObjectWrap::Unwrap<CompositorWrapper>(info.Holder());
   nullcheck(c->_compositor, "compositor.deleteLayer");
 
-  v8::String::Utf8Value val0(info[0]->ToString());
+  Nan::Utf8String val0(info[0]);
   string name(*val0);
 
   bool result = c->_compositor->deleteLayer(name);
@@ -1975,7 +1975,7 @@ void CompositorWrapper::getAllLayers(const Nan::FunctionCallbackInfo<v8::Value>&
     const int argc = 1;
     v8::Local<v8::Value> argv[argc] = { Nan::New<v8::External>(&l) };
 
-    layers->Set(Nan::New(l.getName()).ToLocalChecked(), Nan::NewInstance(cons, argc, argv).ToLocalChecked());
+    Nan::Set(layers, Nan::New(l.getName()).ToLocalChecked(), Nan::NewInstance(cons, argc, argv).ToLocalChecked());
   }
 
   info.GetReturnValue().Set(layers);
@@ -1994,7 +1994,7 @@ void CompositorWrapper::setLayerOrder(const Nan::FunctionCallbackInfo<v8::Value>
   vector<string> names;
   v8::Local<v8::Array> args = info[0].As<v8::Array>();
   for (unsigned int i = 0; i < args->Length(); i++) {
-    v8::String::Utf8Value val0(args->Get(i)->ToString());
+    Nan::Utf8String val0(Nan::Get(args, i).ToLocalChecked());
     string name(*val0);
     names.push_back(name);
   }
@@ -2015,7 +2015,7 @@ void CompositorWrapper::getLayerNames(const Nan::FunctionCallbackInfo<v8::Value>
   auto layerData = c->_compositor->getLayerOrder();
   int i = 0;
   for (auto id : layerData) {
-    layers->Set(i, Nan::New(id).ToLocalChecked());
+    Nan::Set(layers, i, Nan::New(id).ToLocalChecked());
     i++;
   }
 
@@ -2037,7 +2037,7 @@ void CompositorWrapper::imageDimensions(const Nan::FunctionCallbackInfo<v8::Valu
 
   string size;
   if (info[0]->IsString()) {
-    v8::String::Utf8Value i0(info[0]->ToString());
+    Nan::Utf8String i0(info[0]);
     size = string(*i0);
   }
   else {
@@ -2046,8 +2046,8 @@ void CompositorWrapper::imageDimensions(const Nan::FunctionCallbackInfo<v8::Valu
 
   v8::Local<v8::Object> ret = Nan::New<v8::Object>();
 
-  ret->Set(Nan::New("w").ToLocalChecked(), Nan::New(c->_compositor->getWidth(size)));
-  ret->Set(Nan::New("h").ToLocalChecked(), Nan::New(c->_compositor->getHeight(size)));
+  Nan::Set(ret, Nan::New("w").ToLocalChecked(), Nan::New(c->_compositor->getWidth(size)));
+  Nan::Set(ret, Nan::New("h").ToLocalChecked(), Nan::New(c->_compositor->getHeight(size)));
 
   info.GetReturnValue().Set(ret);
 }
@@ -2060,7 +2060,7 @@ void CompositorWrapper::render(const Nan::FunctionCallbackInfo<v8::Value>& info)
   Comp::Image* img;
 
   if (info[0]->IsString()) {
-    v8::String::Utf8Value val0(info[0]->ToString());
+    Nan::Utf8String val0(info[0]);
     string size(*val0);
     img = c->_compositor->render(size);
   }
@@ -2086,7 +2086,7 @@ void CompositorWrapper::asyncRender(const Nan::FunctionCallbackInfo<v8::Value>& 
   Nan::Callback* callback;
 
   if (info[0]->IsString()) {
-    v8::String::Utf8Value val0(info[0]->ToString());
+    Nan::Utf8String val0(info[0]);
     size = string(*val0);
 
     callback = new Nan::Callback(info[1].As<v8::Function>());
@@ -2120,7 +2120,7 @@ void CompositorWrapper::renderContext(const Nan::FunctionCallbackInfo<v8::Value>
 
   string size = "";
   if (info[1]->IsString()) {
-    v8::String::Utf8Value val0(info[1]->ToString());
+    Nan::Utf8String val0(info[1]);
     size = string(*val0);
   }
 
@@ -2153,7 +2153,7 @@ void CompositorWrapper::asyncRenderContext(const Nan::FunctionCallbackInfo<v8::V
   Nan::Callback* callback;
 
   if (info[1]->IsString()) {
-    v8::String::Utf8Value val0(info[1]->ToString());
+    Nan::Utf8String val0(info[1]);
     size = string(*val0);
 
     callback = new Nan::Callback(info[2].As<v8::Function>());
@@ -2195,7 +2195,7 @@ void CompositorWrapper::getCacheSizes(const Nan::FunctionCallbackInfo<v8::Value>
   auto cacheSizes = c->_compositor->getCacheSizes();
   int i = 0;
   for (auto id : cacheSizes) {
-    layers->Set(i, Nan::New(id).ToLocalChecked());
+    Nan::Set(layers, i, Nan::New(id).ToLocalChecked());
     i++;
   }
 
@@ -2211,9 +2211,9 @@ void CompositorWrapper::addCacheSize(const Nan::FunctionCallbackInfo<v8::Value>&
     Nan::ThrowError("addCacheSize expects (string, float)");
   }
 
-  v8::String::Utf8Value val0(info[0]->ToString());
+  Nan::Utf8String val0(info[0]);
   string size(*val0);
-  float scale = (float)info[1]->NumberValue();
+  float scale = (float)Nan::To<double>(info[1]).ToChecked();
 
   info.GetReturnValue().Set(Nan::New(c->_compositor->addCacheSize(size, scale)));
 }
@@ -2227,7 +2227,7 @@ void CompositorWrapper::deleteCacheSize(const Nan::FunctionCallbackInfo<v8::Valu
     Nan::ThrowError("deleteCacheSize expects (string)");
   }
 
-  v8::String::Utf8Value val0(info[0]->ToString());
+  Nan::Utf8String val0(info[0]);
   string size(*val0);
 
   info.GetReturnValue().Set(Nan::New(c->_compositor->deleteCacheSize(size)));
@@ -2242,10 +2242,10 @@ void CompositorWrapper::getCachedImage(const Nan::FunctionCallbackInfo<v8::Value
     Nan::ThrowError("getCachedImage expects (string, string)");
   }
 
-  v8::String::Utf8Value val0(info[0]->ToString());
+  Nan::Utf8String val0(info[0]);
   string id(*val0);
 
-  v8::String::Utf8Value val1(info[1]->ToString());
+  Nan::Utf8String val1(info[1]);
   string size(*val1);
 
   shared_ptr<Comp::Image> img = c->_compositor->getCachedImage(id, size);
@@ -2296,11 +2296,11 @@ void CompositorWrapper::startSearch(const Nan::FunctionCallbackInfo<v8::Value>& 
     v8::Local<v8::Object> ret = info[1].As<v8::Object>();
     auto names = ret->GetOwnPropertyNames();
     for (unsigned int i = 0; i < names->Length(); i++) {
-      v8::Local<v8::Value> val = ret->Get(names->Get(i));
-      v8::String::Utf8Value o1(names->Get(i)->ToString());
+      v8::Local<v8::Value> val = ret->Get(Nan::Get(names, i).ToLocalChecked());
+      Nan::Utf8String o1(Nan::Get(names, i).ToLocalChecked());
       string prop(*o1);
 
-      opt[prop] = (float)val->NumberValue();
+      opt[prop] = (float)Nan::To<double>(val).ToChecked();
     }
   }
 
@@ -2311,7 +2311,7 @@ void CompositorWrapper::startSearch(const Nan::FunctionCallbackInfo<v8::Value>& 
 
   // render size
   if (info[3]->IsString()) {
-    v8::String::Utf8Value val(info[3]->ToString());
+    Nan::Utf8String val(info[3]);
     renderSize = string(*val);
   }
 
@@ -2382,7 +2382,7 @@ void CompositorWrapper::resetImages(const Nan::FunctionCallbackInfo<v8::Value>& 
     Nan::ThrowError("resetImages(string) argument error");
   }
 
-  v8::String::Utf8Value val0(info[0]->ToString());
+  Nan::Utf8String val0(info[0]);
   string name = string(*val0);
 
   c->_compositor->resetImages(name);
@@ -2395,14 +2395,14 @@ void CompositorWrapper::setMaskLayer(const Nan::FunctionCallbackInfo<v8::Value>&
   nullcheck(c->_compositor, "compositor.setMaskLayer");
 
   if (info[0]->IsString() && info[1]->IsInt32() && info[2]->IsInt32() && info[3]->IsInt32() && info[4]->IsString()) {
-    v8::String::Utf8Value val0(info[0]->ToString());
+    Nan::Utf8String val0(info[0]);
     string name(*val0);
 
     Comp::ConstraintType type = (Comp::ConstraintType)info[1]->Int32Value();
     int w = info[2]->Int32Value();
     int h = info[3]->Int32Value();
 
-    v8::String::Utf8Value val1(info[4]->ToString());
+    Nan::Utf8String val1(info[4]);
     string data(*val1);
 
     shared_ptr<Comp::Image> img = shared_ptr<Comp::Image>(new Comp::Image(w, h, data));
@@ -2419,7 +2419,7 @@ void CompositorWrapper::getMaskLayer(const Nan::FunctionCallbackInfo<v8::Value>&
   nullcheck(c->_compositor, "compositor.getMaskLayer");
 
   if (info[0]->IsString()) {
-    v8::String::Utf8Value val0(info[0]->ToString());
+    Nan::Utf8String val0(info[0]);
     string name(*val0);
 
     shared_ptr<Comp::Image> img = c->_compositor->getConstraintData().getRawInput(name);
@@ -2447,7 +2447,7 @@ void CompositorWrapper::deleteMaskLayer(const Nan::FunctionCallbackInfo<v8::Valu
   nullcheck(c->_compositor, "compositor.getMaskLayer");
 
   if (info[0]->IsString()) {
-    v8::String::Utf8Value val0(info[0]->ToString());
+    Nan::Utf8String val0(info[0]);
     string name(*val0);
 
     c->_compositor->getConstraintData().deleteMaskLayer(name);
@@ -2483,21 +2483,21 @@ void CompositorWrapper::paramsToCeres(const Nan::FunctionCallbackInfo<v8::Value>
 
     v8::Local<v8::Array> ptsArr = info[1].As<v8::Array>();
     for (int i = 0; i < ptsArr->Length(); i++) {
-      v8::Local<v8::Object> pt = ptsArr->Get(i).As<v8::Object>();
-      pts.push_back(Comp::Point(pt->Get(Nan::New("x").ToLocalChecked())->NumberValue(),
-        pt->Get(Nan::New("y").ToLocalChecked())->NumberValue()));
+      v8::Local<v8::Object> pt = Nan::Get(ptsArr, i).ToLocalChecked().As<v8::Object>();
+      pts.push_back(Comp::Point(Nan::Get(pt, Nan::New("x").ToLocalChecked()).ToLocalChecked()->NumberValue(),
+        Nan::Get(pt, Nan::New("y").ToLocalChecked()).ToLocalChecked()->NumberValue()));
     }
 
     // colors
     vector<Comp::RGBColor> colors;
     v8::Local<v8::Array> colorArr = info[2].As<v8::Array>();
     for (int i = 0; i < colorArr->Length(); i++) {
-      v8::Local<v8::Object> color = colorArr->Get(i).As<v8::Object>();
+      v8::Local<v8::Object> color = Nan::Get(colorArr, i).ToLocalChecked().As<v8::Object>();
 
       Comp::RGBColor c;
-      c._r = color->Get(Nan::New("r").ToLocalChecked())->NumberValue();
-      c._g = color->Get(Nan::New("g").ToLocalChecked())->NumberValue();
-      c._b = color->Get(Nan::New("b").ToLocalChecked())->NumberValue();
+      c._r = Nan::Get(color, Nan::New("r").ToLocalChecked()).ToLocalChecked()->NumberValue();
+      c._g = Nan::Get(color, Nan::New("g").ToLocalChecked()).ToLocalChecked()->NumberValue();
+      c._b = Nan::Get(color, Nan::New("b").ToLocalChecked()).ToLocalChecked()->NumberValue();
       colors.push_back(c);
     }
 
@@ -2505,11 +2505,11 @@ void CompositorWrapper::paramsToCeres(const Nan::FunctionCallbackInfo<v8::Value>
     vector<double> weights;
     v8::Local<v8::Array> weightArr = info[3].As<v8::Array>();
     for (int i = 0; i < weightArr->Length(); i++) {
-      weights.push_back(weightArr->Get(i)->NumberValue());
+      weights.push_back(Nan::Get(weightArr, i).ToLocalChecked()->NumberValue());
     }
 
     // output
-    v8::String::Utf8Value val4(info[4]->ToString());
+    Nan::Utf8String val4(info[4]);
     string out(*val4);
 
     c->_compositor->paramsToCeres(ctx->_context, pts, colors, weights, out);
@@ -2525,7 +2525,7 @@ void CompositorWrapper::ceresToContext(const Nan::FunctionCallbackInfo<v8::Value
   nullcheck(c->_compositor, "compositor.ceresToContext");
 
   if (info[0]->IsString()) {
-    v8::String::Utf8Value val0(info[0]->ToString());
+    Nan::Utf8String val0(info[0]);
     string file(*val0);
 
     map<string, float> metadata;
@@ -2548,13 +2548,13 @@ void CompositorWrapper::ceresToContext(const Nan::FunctionCallbackInfo<v8::Value
     // metadta object
     v8::Local<v8::Object> meta = Nan::New<v8::Object>();
     for (auto& kvp : metadata) {
-      meta->Set(Nan::New(kvp.first).ToLocalChecked(), Nan::New(kvp.second));
+      Nan::Set(meta, Nan::New(kvp.first).ToLocalChecked(), Nan::New(kvp.second));
     }
 
     // return object
     v8::Local<v8::Object> ret = Nan::New<v8::Object>();
-    ret->Set(Nan::New("context").ToLocalChecked(), context);
-    ret->Set(Nan::New("metadata").ToLocalChecked(), meta);
+    Nan::Set(ret, Nan::New("context").ToLocalChecked(), context);
+    Nan::Set(ret, Nan::New("metadata").ToLocalChecked(), meta);
 
     info.GetReturnValue().Set(ret);
   }
@@ -2581,10 +2581,10 @@ void CompositorWrapper::renderPixel(const Nan::FunctionCallbackInfo<v8::Value>& 
     Comp::RGBAColor px = c->_compositor->renderPixel(ctx->_context, x, y);
 
     v8::Local<v8::Object> color = Nan::New<v8::Object>();
-    color->Set(Nan::New("r").ToLocalChecked(), Nan::New(px._r));
-    color->Set(Nan::New("g").ToLocalChecked(), Nan::New(px._g));
-    color->Set(Nan::New("b").ToLocalChecked(), Nan::New(px._b));
-    color->Set(Nan::New("a").ToLocalChecked(), Nan::New(px._a));
+    Nan::Set(color, Nan::New("r").ToLocalChecked(), Nan::New(px._r));
+    Nan::Set(color, Nan::New("g").ToLocalChecked(), Nan::New(px._g));
+    Nan::Set(color, Nan::New("b").ToLocalChecked(), Nan::New(px._b));
+    Nan::Set(color, Nan::New("a").ToLocalChecked(), Nan::New(px._a));
 
     info.GetReturnValue().Set(color);
   }
@@ -2601,24 +2601,24 @@ void CompositorWrapper::getPixelConstraints(const Nan::FunctionCallbackInfo<v8::
   if (info[0]->IsObject()) {
     v8::Local<v8::Object> opt = info[0].As<v8::Object>();
 
-    if (opt->Get(Nan::New("detailedLog").ToLocalChecked())->IsBoolean()) {
-      c->_compositor->getConstraintData()._verboseDebugMode = opt->Get(Nan::New("detailedLog").ToLocalChecked())->BooleanValue();
+    if (Nan::Get(opt, Nan::New("detailedLog").ToLocalChecked()).ToLocalChecked()->IsBoolean()) {
+      c->_compositor->getConstraintData()._verboseDebugMode = Nan::Get(opt, Nan::New("detailedLog").ToLocalChecked()).ToLocalChecked()->BooleanValue();
     }
 
-    if (opt->Get(Nan::New("unconstrainedDensity").ToLocalChecked())->IsInt32()) {
-      c->_compositor->getConstraintData()._unconstDensity = opt->Get(Nan::New("unconstrainedDensity").ToLocalChecked())->Int32Value();
+    if (Nan::Get(opt, Nan::New("unconstrainedDensity").ToLocalChecked()).ToLocalChecked()->IsInt32()) {
+      c->_compositor->getConstraintData()._unconstDensity = Nan::Get(opt, Nan::New("unconstrainedDensity").ToLocalChecked()).ToLocalChecked()->Int32Value();
     }
 
-    if (opt->Get(Nan::New("constrainedDensity").ToLocalChecked())->IsInt32()) {
-      c->_compositor->getConstraintData()._constDensity = opt->Get(Nan::New("constrainedDensity").ToLocalChecked())->Int32Value();
+    if (Nan::Get(opt, Nan::New("constrainedDensity").ToLocalChecked()).ToLocalChecked()->IsInt32()) {
+      c->_compositor->getConstraintData()._constDensity = Nan::Get(opt, Nan::New("constrainedDensity").ToLocalChecked()).ToLocalChecked()->Int32Value();
     }
 
-    if (opt->Get(Nan::New("unconstrainedWeight").ToLocalChecked())->IsNumber()) {
-      c->_compositor->getConstraintData()._totalUnconstrainedWeight = opt->Get(Nan::New("unconstrainedWeight").ToLocalChecked())->NumberValue();
+    if (Nan::Get(opt, Nan::New("unconstrainedWeight").ToLocalChecked()).ToLocalChecked()->IsNumber()) {
+      c->_compositor->getConstraintData()._totalUnconstrainedWeight = Nan::Get(opt, Nan::New("unconstrainedWeight").ToLocalChecked()).ToLocalChecked()->NumberValue();
     }
 
-    if (opt->Get(Nan::New("constrainedWeight").ToLocalChecked())->IsNumber()) {
-      c->_compositor->getConstraintData()._totalConstrainedWeight = opt->Get(Nan::New("constrainedWeight").ToLocalChecked())->NumberValue();
+    if (Nan::Get(opt, Nan::New("constrainedWeight").ToLocalChecked()).ToLocalChecked()->IsNumber()) {
+      c->_compositor->getConstraintData()._totalConstrainedWeight = Nan::Get(opt, Nan::New("constrainedWeight").ToLocalChecked()).ToLocalChecked()->NumberValue();
     }
   }
 
@@ -2636,18 +2636,18 @@ void CompositorWrapper::getPixelConstraints(const Nan::FunctionCallbackInfo<v8::
     v8::Local<v8::Object> loc = Nan::New<v8::Object>();
     v8::Local<v8::Object> color = Nan::New<v8::Object>();
 
-    loc->Set(Nan::New("x").ToLocalChecked(), Nan::New(c._pt._x));
-    loc->Set(Nan::New("y").ToLocalChecked(), Nan::New(c._pt._y));
-    constraint->Set(Nan::New("pt").ToLocalChecked(), loc);
+    Nan::Set(loc, Nan::New("x").ToLocalChecked(), Nan::New(c._pt._x));
+    Nan::Set(loc, Nan::New("y").ToLocalChecked(), Nan::New(c._pt._y));
+    Nan::Set(constraint, Nan::New("pt").ToLocalChecked(), loc);
 
-    color->Set(Nan::New("r").ToLocalChecked(), Nan::New(c._color._r));
-    color->Set(Nan::New("g").ToLocalChecked(), Nan::New(c._color._g));
-    color->Set(Nan::New("b").ToLocalChecked(), Nan::New(c._color._b));
-    constraint->Set(Nan::New("color").ToLocalChecked(), color);
+    Nan::Set(color, Nan::New("r").ToLocalChecked(), Nan::New(c._color._r));
+    Nan::Set(color, Nan::New("g").ToLocalChecked(), Nan::New(c._color._g));
+    Nan::Set(color, Nan::New("b").ToLocalChecked(), Nan::New(c._color._b));
+    Nan::Set(constraint, Nan::New("color").ToLocalChecked(), color);
 
-    constraint->Set(Nan::New("weight").ToLocalChecked(), Nan::New(c._weight));
+    Nan::Set(constraint, Nan::New("weight").ToLocalChecked(), Nan::New(c._weight));
 
-    ret->Set(Nan::New(i), constraint);
+    Nan::Set(ret, Nan::New(i), constraint);
   }
 
   info.GetReturnValue().Set(ret);
@@ -2666,7 +2666,7 @@ void CompositorWrapper::computeErrorMap(const Nan::FunctionCallbackInfo<v8::Valu
     }
     ContextWrapper* ctx = Nan::ObjectWrap::Unwrap<ContextWrapper>(maybe1.ToLocalChecked());
 
-    v8::String::Utf8Value val0(info[1]->ToString());
+    Nan::Utf8String val0(info[1]);
     string file(*val0);
 
     shared_ptr<Comp::Image> render = shared_ptr<Comp::Image>(c->_compositor->render(ctx->_context));
@@ -2688,12 +2688,12 @@ void CompositorWrapper::addSearchGroup(const Nan::FunctionCallbackInfo<v8::Value
 
     // type
     Comp::SearchGroup g;
-    g._type = (Comp::SearchGroupType)(data->Get(Nan::New("type").ToLocalChecked())->Int32Value());
+    g._type = (Comp::SearchGroupType)(Nan::Get(data, Nan::New("type").ToLocalChecked()).ToLocalChecked()->Int32Value());
 
     // names
-    v8::Local<v8::Array> names = data->Get(Nan::New("layers").ToLocalChecked()).As<v8::Array>();
+    v8::Local<v8::Array> names = Nan::Get(data, Nan::New("layers").ToLocalChecked()).ToLocalChecked().As<v8::Array>();
     for (int i = 0; i < names->Length(); i++) {
-      v8::String::Utf8Value val0(names->Get(Nan::New(i))->ToString());
+      Nan::Utf8String val0(Nan::Get(names, Nan::New(i)).ToLocalChecked());
       string name(*val0);
       g._layerNames.push_back(name);
     }
@@ -2724,7 +2724,7 @@ void CompositorWrapper::contextFromVector(const Nan::FunctionCallbackInfo<v8::Va
     v8::Local<v8::Array> v8Data = info[0].As<v8::Array>();
 
     for (int i = 0; i < v8Data->Length(); i++) {
-      data.push_back(v8Data->Get(i)->NumberValue());
+      data.push_back(Nan::Get(v8Data, i).ToLocalChecked()->NumberValue());
     }
 
     Comp::Context ctx = c->_compositor->vectorToContext(data);
@@ -2745,7 +2745,7 @@ void CompositorWrapper::contextFromDarkroom(const Nan::FunctionCallbackInfo<v8::
   CompositorWrapper* c = ObjectWrap::Unwrap<CompositorWrapper>(info.Holder());
   nullcheck(c->_compositor, "compositor.contextFromDarkroom");
 
-  v8::String::Utf8Value f(info[0]->ToString());
+  Nan::Utf8String f(info[0]);
   Comp::Context ctx = c->_compositor->contextFromDarkroom(string(*f));
 
   const int argc = 1;
@@ -2769,7 +2769,7 @@ void CompositorWrapper::localImportance(const Nan::FunctionCallbackInfo<v8::Valu
   string size = "";
 
   if (info[1]->IsString()) {
-    v8::String::Utf8Value i1(info[1]->ToString());
+    Nan::Utf8String i1(info[1]);
     size = string(*i1);
   }
 
@@ -2781,16 +2781,16 @@ void CompositorWrapper::localImportance(const Nan::FunctionCallbackInfo<v8::Valu
   for (auto& i : imp) {
     v8::Local<v8::Object> impData = Nan::New<v8::Object>();
 
-    impData->Set(Nan::New("layerName").ToLocalChecked(), Nan::New(i._layerName).ToLocalChecked());
-    impData->Set(Nan::New("adjType").ToLocalChecked(), Nan::New(i._adjType));
-    impData->Set(Nan::New("param").ToLocalChecked(), Nan::New(i._param).ToLocalChecked());
-    impData->Set(Nan::New("depth").ToLocalChecked(), Nan::New(i._depth));
-    impData->Set(Nan::New("totalAlpha").ToLocalChecked(), Nan::New(i._totalAlpha));
-    impData->Set(Nan::New("totalLuma").ToLocalChecked(), Nan::New(i._totalLuma));
-    impData->Set(Nan::New("deltaMag").ToLocalChecked(), Nan::New(i._deltaMag));
-    impData->Set(Nan::New("mssim").ToLocalChecked(), Nan::New(i._mssim));
+    Nan::Set(impData, Nan::New("layerName").ToLocalChecked(), Nan::New(i._layerName).ToLocalChecked());
+    Nan::Set(impData, Nan::New("adjType").ToLocalChecked(), Nan::New(i._adjType));
+    Nan::Set(impData, Nan::New("param").ToLocalChecked(), Nan::New(i._param).ToLocalChecked());
+    Nan::Set(impData, Nan::New("depth").ToLocalChecked(), Nan::New(i._depth));
+    Nan::Set(impData, Nan::New("totalAlpha").ToLocalChecked(), Nan::New(i._totalAlpha));
+    Nan::Set(impData, Nan::New("totalLuma").ToLocalChecked(), Nan::New(i._totalLuma));
+    Nan::Set(impData, Nan::New("deltaMag").ToLocalChecked(), Nan::New(i._deltaMag));
+    Nan::Set(impData, Nan::New("mssim").ToLocalChecked(), Nan::New(i._mssim));
 
-    ret->Set(idx, impData);
+    Nan::Set(ret, idx, impData);
     idx++;
   }
 
@@ -2804,14 +2804,14 @@ void CompositorWrapper::importanceInRegion(const Nan::FunctionCallbackInfo<v8::V
 
   // mode
   if (info[0]->IsString() && info[1]->IsObject()) {
-    v8::String::Utf8Value i0(info[0]->ToString());
+    Nan::Utf8String i0(info[0]);
     string mode(*i0);
 
     v8::Local<v8::Object> region = info[1].As<v8::Object>();
-    int x = region->Get(Nan::New("x").ToLocalChecked())->Int32Value();
-    int y = region->Get(Nan::New("y").ToLocalChecked())->Int32Value();
-    int w = region->Get(Nan::New("w").ToLocalChecked())->Int32Value();
-    int h = region->Get(Nan::New("h").ToLocalChecked())->Int32Value();
+    int x = Nan::Get(region, Nan::New("x").ToLocalChecked()).ToLocalChecked()->Int32Value();
+    int y = Nan::Get(region, Nan::New("y").ToLocalChecked()).ToLocalChecked()->Int32Value();
+    int w = Nan::Get(region, Nan::New("w").ToLocalChecked()).ToLocalChecked()->Int32Value();
+    int h = Nan::Get(region, Nan::New("h").ToLocalChecked()).ToLocalChecked()->Int32Value();
 
     vector<double> scores;
     vector<string> names;
@@ -2822,9 +2822,9 @@ void CompositorWrapper::importanceInRegion(const Nan::FunctionCallbackInfo<v8::V
     for (int i = 0; i < scores.size(); i++) {
       v8::Local<v8::Object> obj = Nan::New<v8::Object>();
 
-      obj->Set(Nan::New("name").ToLocalChecked(), Nan::New(names[i]).ToLocalChecked());
-      obj->Set(Nan::New("score").ToLocalChecked(), Nan::New(scores[i]));
-      ret->Set(Nan::New(i), obj);
+      Nan::Set(obj, Nan::New("name").ToLocalChecked(), Nan::New(names[i]).ToLocalChecked());
+      Nan::Set(obj, Nan::New("score").ToLocalChecked(), Nan::New(scores[i]));
+      Nan::Set(ret, Nan::New(i), obj);
     }
 
     info.GetReturnValue().Set(ret);
@@ -2838,12 +2838,12 @@ void CompositorWrapper::pointImportance(const Nan::FunctionCallbackInfo<v8::Valu
 
   // mode
   if (info[0]->IsString() && info[1]->IsObject() && info[2]->IsObject()) {
-    v8::String::Utf8Value i0(info[0]->ToString());
+    Nan::Utf8String i0(info[0]);
     string mode(*i0);
 
     v8::Local<v8::Object> region = info[1].As<v8::Object>();
-    int x = region->Get(Nan::New("x").ToLocalChecked())->Int32Value();
-    int y = region->Get(Nan::New("y").ToLocalChecked())->Int32Value();
+    int x = Nan::Get(region, Nan::New("x").ToLocalChecked()).ToLocalChecked()->Int32Value();
+    int y = Nan::Get(region, Nan::New("y").ToLocalChecked()).ToLocalChecked()->Int32Value();
 
     Nan::MaybeLocal<v8::Object> maybe2 = Nan::To<v8::Object>(info[2]);
     if (maybe2.IsEmpty()) {
@@ -2860,9 +2860,9 @@ void CompositorWrapper::pointImportance(const Nan::FunctionCallbackInfo<v8::Valu
     for (auto& kvp : scores) {
       v8::Local<v8::Object> obj = Nan::New<v8::Object>();
 
-      obj->Set(Nan::New("name").ToLocalChecked(), Nan::New(kvp.first).ToLocalChecked());
-      obj->Set(Nan::New("score").ToLocalChecked(), Nan::New(kvp.second));
-      ret->Set(Nan::New(i), obj);
+      Nan::Set(obj, Nan::New("name").ToLocalChecked(), Nan::New(kvp.first).ToLocalChecked());
+      Nan::Set(obj, Nan::New("score").ToLocalChecked(), Nan::New(kvp.second));
+      Nan::Set(ret, Nan::New(i), obj);
       i++;
     }
 
@@ -2876,7 +2876,7 @@ void CompositorWrapper::computeImportanceMap(const Nan::FunctionCallbackInfo<v8:
   nullcheck(c->_compositor, "compositor.computeImportanceMap");
 
   if (info[0]->IsString() && info[1]->IsNumber() && info[2]->IsObject()) {
-    v8::String::Utf8Value i0(info[0]->ToString());
+    Nan::Utf8String i0(info[0]);
     Comp::ImportanceMapMode mode = (Comp::ImportanceMapMode)(info[1]->IntegerValue());
 
     Nan::MaybeLocal<v8::Object> maybe2 = Nan::To<v8::Object>(info[2]);
@@ -2927,7 +2927,7 @@ void CompositorWrapper::getImportanceMap(const Nan::FunctionCallbackInfo<v8::Val
 
   // existence check
   if (info[0]->IsString() && info[1]->IsNumber()) {
-    v8::String::Utf8Value i0(info[0]->ToString());
+    Nan::Utf8String i0(info[0]);
     if (c->_compositor->importanceMapExists(string(*i0), (Comp::ImportanceMapMode)(info[1]->IntegerValue()))) {
       const int argc = 3;
       v8::Local<v8::Value> argv[argc] = { Nan::New<v8::External>(c->_compositor), info[0], info[1] };
@@ -2944,7 +2944,7 @@ void CompositorWrapper::deleteImportanceMap(const Nan::FunctionCallbackInfo<v8::
   nullcheck(c->_compositor, "compositor.deleteImportanceMap");
 
   if (info[0]->IsString() && info[1]->IsNumber()) {
-    v8::String::Utf8Value i0(info[0]->ToString());
+    Nan::Utf8String i0(info[0]);
     c->_compositor->deleteImportanceMap(string(*i0), (Comp::ImportanceMapMode)info[1]->Int32Value());
   }
   else {
@@ -2958,7 +2958,7 @@ void CompositorWrapper::deleteLayerImportanceMaps(const Nan::FunctionCallbackInf
   nullcheck(c->_compositor, "compositor.deleteLayerImportanceMaps");
 
   if (info[0]->IsString()) {
-    v8::String::Utf8Value i0(info[0]->ToString());
+    Nan::Utf8String i0(info[0]);
     c->_compositor->deleteLayerImportanceMaps(string(*i0));
   }
   else {
@@ -2993,7 +2993,7 @@ void CompositorWrapper::dumpImportanceMaps(const Nan::FunctionCallbackInfo<v8::V
   nullcheck(c->_compositor, "compositor.dumpImportanceMaps");
 
   if (info[0]->IsString()) {
-    v8::String::Utf8Value i0(info[0]->ToString());
+    Nan::Utf8String i0(info[0]);
 
     c->_compositor->dumpImportanceMaps(string(*i0));
   }
@@ -3014,11 +3014,11 @@ void CompositorWrapper::availableImportanceMaps(const Nan::FunctionCallbackInfo<
     v8::Local<v8::Array> typeList = Nan::New<v8::Array>();
     int i = 0;
     for (auto& types : kvp.second) {
-      typeList->Set(Nan::New(i), Nan::New(types.first));
+      Nan::Set(typeList, Nan::New(i), Nan::New(types.first));
       i++;
     }
 
-    maps->Set(Nan::New(kvp.first).ToLocalChecked(), typeList);
+    Nan::Set(maps, Nan::New(kvp.first).ToLocalChecked(), typeList);
   }
 
   info.GetReturnValue().Set(maps);
@@ -3070,7 +3070,7 @@ void CompositorWrapper::uniqueTags(const Nan::FunctionCallbackInfo<v8::Value>& i
 
   int i = 0;
   for (auto& t : tags) {
-    ret->Set(i, Nan::New(t).ToLocalChecked());
+    Nan::Set(ret, i, Nan::New(t).ToLocalChecked());
     i++;
   }
 
@@ -3083,14 +3083,14 @@ void CompositorWrapper::getTags(const Nan::FunctionCallbackInfo<v8::Value>& info
   nullcheck(c->_compositor, "compositor.getTags");
 
   if (info[0]->IsString()) {
-    v8::String::Utf8Value i0(info[0]->ToString());
+    Nan::Utf8String i0(info[0]);
     set<string> tags = c->_compositor->getTags(string(*i0));
 
     v8::Local<v8::Array> ret = Nan::New<v8::Array>();
 
     int i = 0;
     for (auto& t : tags) {
-      ret->Set(i, Nan::New(t).ToLocalChecked());
+      Nan::Set(ret, i, Nan::New(t).ToLocalChecked());
       i++;
     }
 
@@ -3115,11 +3115,11 @@ void CompositorWrapper::allTags(const Nan::FunctionCallbackInfo<v8::Value>& info
     int i = 0;
 
     for (auto& tag : kvp.second) {
-      t->Set(i, Nan::New(tag).ToLocalChecked());
+      Nan::Set(t, i, Nan::New(tag).ToLocalChecked());
       i++;
     }
 
-    ret->Set(Nan::New(kvp.first).ToLocalChecked(), t);
+    Nan::Set(ret, Nan::New(kvp.first).ToLocalChecked(), t);
   }
 
   info.GetReturnValue().Set(ret);
@@ -3131,7 +3131,7 @@ void CompositorWrapper::deleteTags(const Nan::FunctionCallbackInfo<v8::Value>& i
   nullcheck(c->_compositor, "compositor.deleteTags");
 
   if (info[0]->IsString()) {
-    v8::String::Utf8Value i0(info[0]->ToString());
+    Nan::Utf8String i0(info[0]);
     c->_compositor->deleteTags(string(*i0));
   }
   else {
@@ -3153,8 +3153,8 @@ void CompositorWrapper::hasTag(const Nan::FunctionCallbackInfo<v8::Value>& info)
   nullcheck(c->_compositor, "compositor.hasTag");
 
   if (info[0]->IsString() && info[1]->IsString()) {
-    v8::String::Utf8Value i0(info[0]->ToString());
-    v8::String::Utf8Value i1(info[1]->ToString());
+    Nan::Utf8String i0(info[0]);
+    Nan::Utf8String i1(info[1]);
 
     bool ret = c->_compositor->hasTag(string(*i0), string(*i1));
     info.GetReturnValue().Set(Nan::New(ret));
@@ -3173,14 +3173,14 @@ void CompositorWrapper::goalSelect(const Nan::FunctionCallbackInfo<v8::Value>& i
   if (info[0]->IsObject() && info[1]->IsObject() && info[2]->IsNumber() && info[3]->IsNumber()) {
     // info[0] should contain a goal object
     v8::Local<v8::Object> goal = info[0].As<v8::Object>();
-    Comp::GoalType gt = (Comp::GoalType)(goal->Get(Nan::New("type").ToLocalChecked())->IntegerValue());
-    Comp::GoalTarget ga = (Comp::GoalTarget)(goal->Get(Nan::New("target").ToLocalChecked())->IntegerValue());
-    v8::Local<v8::Object> color = goal->Get(Nan::New("color").ToLocalChecked()).As<v8::Object>();
+    Comp::GoalType gt = (Comp::GoalType)(Nan::Get(goal, Nan::New("type").ToLocalChecked()).ToLocalChecked()->IntegerValue());
+    Comp::GoalTarget ga = (Comp::GoalTarget)(Nan::Get(goal, Nan::New("target").ToLocalChecked()).ToLocalChecked()->IntegerValue());
+    v8::Local<v8::Object> color = Nan::Get(goal, Nan::New("color").ToLocalChecked()).ToLocalChecked().As<v8::Object>();
 
     Comp::RGBAColor targetColor;
-    targetColor._r = color->Get(Nan::New("r").ToLocalChecked())->NumberValue();
-    targetColor._g = color->Get(Nan::New("g").ToLocalChecked())->NumberValue();
-    targetColor._b = color->Get(Nan::New("b").ToLocalChecked())->NumberValue();
+    targetColor._r = Nan::Get(color, Nan::New("r").ToLocalChecked()).ToLocalChecked()->NumberValue();
+    targetColor._g = Nan::Get(color, Nan::New("g").ToLocalChecked()).ToLocalChecked()->NumberValue();
+    targetColor._b = Nan::Get(color, Nan::New("b").ToLocalChecked()).ToLocalChecked()->NumberValue();
     targetColor._a = 1;
 
     Comp::Goal g(gt, ga);
@@ -3227,16 +3227,16 @@ void CompositorWrapper::goalSelect(const Nan::FunctionCallbackInfo<v8::Value>& i
 
         for (int i = 0; i < a.second.size(); i++) {
           v8::Local<v8::Object> gr = Nan::New<v8::Object>();
-          gr->Set(Nan::New("param").ToLocalChecked(), Nan::New(a.second[i]._param).ToLocalChecked());
-          gr->Set(Nan::New("val").ToLocalChecked(), Nan::New(a.second[i]._val));
+          Nan::Set(gr, Nan::New("param").ToLocalChecked(), Nan::New(a.second[i]._param).ToLocalChecked());
+          Nan::Set(gr, Nan::New("val").ToLocalChecked(), Nan::New(a.second[i]._val));
 
-          params->Set(i, gr);
+          Nan::Set(params, i, gr);
         }
 
-        adjustments->Set(Nan::New(a.first), params);
+        Nan::Set(adjustments, Nan::New(a.first), params);
       }
 
-      ret->Set(Nan::New(r.first).ToLocalChecked(), adjustments);
+      Nan::Set(ret, Nan::New(r.first).ToLocalChecked(), adjustments);
     }
 
     info.GetReturnValue().Set(ret);
@@ -3256,10 +3256,10 @@ void CompositorWrapper::addMask(const Nan::FunctionCallbackInfo<v8::Value>& info
   nullcheck(c->_compositor, "compositor.addLayer");
 
   bool result;
-  v8::String::Utf8Value val0(info[0]->ToString());
+  Nan::Utf8String val0(info[0]);
   string name(*val0);
 
-  v8::String::Utf8Value val1(info[1]->ToString());
+  Nan::Utf8String val1(info[1]);
   string path(*val1);
 
   result = c->_compositor->addLayerMask(name, path);
@@ -3278,7 +3278,7 @@ void CompositorWrapper::addPoissonDiskCache(const Nan::FunctionCallbackInfo<v8::
     int k = 30;
 
     if (info[2]->IsNumber()) {
-      k = info[2]->NumberValue();
+      k = Nan::To<double>(info[2]).ToChecked();
     }
 
     c->_compositor->initPoissonDisk(n, level, k);
@@ -3300,23 +3300,23 @@ void CompositorWrapper::addGroup(const Nan::FunctionCallbackInfo<v8::Value>& inf
   nullcheck(c->_compositor, "compositor.addGroup");
 
   if (info[0]->IsString() && info[1]->IsArray() && info[2]->IsNumber()) {
-    v8::String::Utf8Value i0(info[0]->ToString());
+    Nan::Utf8String i0(info[0]);
     string name(*i0);
 
     set<string> layers;
     v8::Local<v8::Array> arr = info[1].As<v8::Array>();
     for (int i = 0; i < arr->Length(); i++) {
-      v8::String::Utf8Value av(arr->Get(i)->ToString());
+      Nan::Utf8String av(Nan::Get(arr, i).ToLocalChecked());
       string lname(*av);
 
       layers.insert(lname);
     }
 
-    float priority = info[2]->NumberValue();
+    float priority = Nan::To<double>(info[2]).ToChecked();
 
     bool readOnly = false;
     if (info[3]->IsBoolean())
-      readOnly = info[3]->BooleanValue();
+      readOnly =Nan::To<bool>( info[3]).ToChecked();
 
     bool res = c->_compositor->addGroup(name, layers, priority, readOnly);
     info.GetReturnValue().Set(Nan::New(res));
@@ -3332,7 +3332,7 @@ void CompositorWrapper::addGroupEffect(const Nan::FunctionCallbackInfo<v8::Value
   nullcheck(c->_compositor, "compositor.addGroupEffect");
 
   if (info[0]->IsString() && info[1]->IsObject()) {
-    v8::String::Utf8Value i0(info[0]->ToString());
+    Nan::Utf8String i0(info[0]);
     string group(*i0);
 
     // bunch of options here
@@ -3344,7 +3344,7 @@ void CompositorWrapper::addGroupEffect(const Nan::FunctionCallbackInfo<v8::Value
     }
 
     Comp::ImageEffect effect;
-    int mode = obj->Get(Nan::New("mode").ToLocalChecked())->IntegerValue();
+    int mode = Nan::Get(obj, Nan::New("mode").ToLocalChecked()).ToLocalChecked()->IntegerValue();
     effect._mode = (Comp::EffectMode)mode;
 
     if (mode == Comp::EffectMode::STROKE) {
@@ -3355,12 +3355,12 @@ void CompositorWrapper::addGroupEffect(const Nan::FunctionCallbackInfo<v8::Value
         Nan::ThrowError("Stroke effect needs a color");
       }
 
-      effect._width = obj->Get(Nan::New("width").ToLocalChecked())->IntegerValue();
+      effect._width = Nan::Get(obj, Nan::New("width").ToLocalChecked()).ToLocalChecked()->IntegerValue();
 
-      auto rgb = obj->Get(Nan::New("color").ToLocalChecked()).As<v8::Object>();
-      effect._color._r = rgb->Get(Nan::New("r").ToLocalChecked())->NumberValue();
-      effect._color._g = rgb->Get(Nan::New("g").ToLocalChecked())->NumberValue();
-      effect._color._b = rgb->Get(Nan::New("b").ToLocalChecked())->NumberValue();
+      auto rgb = Nan::Get(obj, Nan::New("color").ToLocalChecked()).ToLocalChecked().As<v8::Object>();
+      effect._color._r = Nan::Get(rgb, Nan::New("r").ToLocalChecked()).ToLocalChecked()->NumberValue();
+      effect._color._g = Nan::Get(rgb, Nan::New("g").ToLocalChecked()).ToLocalChecked()->NumberValue();
+      effect._color._b = Nan::Get(rgb, Nan::New("b").ToLocalChecked()).ToLocalChecked()->NumberValue();
     }
 
     c->_compositor->setGroupEffect(group, effect);
@@ -3376,23 +3376,23 @@ void CompositorWrapper::addGroupFromExistingLayer(const Nan::FunctionCallbackInf
   nullcheck(c->_compositor, "compositor.addGroupFromExistingLayer");
 
   if (info[0]->IsString() && info[1]->IsArray() && info[2]->IsNumber()) {
-    v8::String::Utf8Value i0(info[0]->ToString());
+    Nan::Utf8String i0(info[0]);
     string name(*i0);
 
     set<string> layers;
     v8::Local<v8::Array> arr = info[1].As<v8::Array>();
     for (int i = 0; i < arr->Length(); i++) {
-      v8::String::Utf8Value av(arr->Get(i)->ToString());
+      Nan::Utf8String av(Nan::Get(arr, i).ToLocalChecked());
       string lname(*av);
 
       layers.insert(lname);
     }
 
-    float priority = info[2]->NumberValue();
+    float priority = Nan::To<double>(info[2]).ToChecked();
 
     bool readOnly = false;
     if (info[3]->IsBoolean())
-      readOnly = info[3]->BooleanValue();
+      readOnly =Nan::To<bool>( info[3]).ToChecked();
 
     bool res = c->_compositor->addGroupFromExistingLayer(name, layers, priority, readOnly);
     info.GetReturnValue().Set(Nan::New(res));
@@ -3408,7 +3408,7 @@ void CompositorWrapper::deleteGroup(const Nan::FunctionCallbackInfo<v8::Value>& 
   nullcheck(c->_compositor, "compositor.deleteGroup");
 
   if (info[0]->IsString()) {
-    v8::String::Utf8Value i0(info[0]->ToString());
+    Nan::Utf8String i0(info[0]);
     string name(*i0);
 
     c->_compositor->deleteGroup(name);
@@ -3424,8 +3424,8 @@ void CompositorWrapper::addLayerToGroup(const Nan::FunctionCallbackInfo<v8::Valu
   nullcheck(c->_compositor, "compositor.addLayerToGroup");
 
   if (info[0]->IsString() && info[1]->IsString()) {
-    v8::String::Utf8Value i0(info[0]->ToString());
-    v8::String::Utf8Value i1(info[1]->ToString());
+    Nan::Utf8String i0(info[0]);
+    Nan::Utf8String i1(info[1]);
 
     string layer(*i0);
     string group(*i1);
@@ -3443,8 +3443,8 @@ void CompositorWrapper::removeLayerFromGroup(const Nan::FunctionCallbackInfo<v8:
   nullcheck(c->_compositor, "compositor.removeLayerFromGroup");
 
   if (info[0]->IsString() && info[1]->IsString()) {
-    v8::String::Utf8Value i0(info[0]->ToString());
-    v8::String::Utf8Value i1(info[1]->ToString());
+    Nan::Utf8String i0(info[0]);
+    Nan::Utf8String i1(info[1]);
 
     string layer(*i0);
     string group(*i1);
@@ -3466,10 +3466,10 @@ void CompositorWrapper::setGroupOrder(const Nan::FunctionCallbackInfo<v8::Value>
     v8::Local<v8::Array> vals = info[0].As<v8::Array>();
     multimap<float, string> order;
     for (int i = 0; i < vals->Length(); i++) {
-      v8::Local<v8::Object> obj = vals->Get(i).As<v8::Object>();
+      v8::Local<v8::Object> obj = Nan::Get(vals, i).ToLocalChecked().As<v8::Object>();
 
-      float val = obj->Get(Nan::New("val").ToLocalChecked())->NumberValue();
-      v8::String::Utf8Value n(obj->Get(Nan::New("group").ToLocalChecked())->ToString());
+      float val = Nan::Get(obj, Nan::New("val").ToLocalChecked()).ToLocalChecked()->NumberValue();
+      Nan::Utf8String n(Nan::Get(obj, Nan::New("group").ToLocalChecked()).ToLocalChecked());
       string group(*n);
 
       order.insert(make_pair(val, group));
@@ -3478,10 +3478,10 @@ void CompositorWrapper::setGroupOrder(const Nan::FunctionCallbackInfo<v8::Value>
     c->_compositor->setGroupOrder(order);
   }
   else if (info[0]->IsString() && info[1]->IsNumber()) {
-    v8::String::Utf8Value i0(info[0]->ToString());
+    Nan::Utf8String i0(info[0]);
     string group(*i0);
 
-    float priority = info[1]->NumberValue();
+    float priority = Nan::To<double>(info[1]).ToChecked();
 
     c->_compositor->setGroupOrder(group, priority);
   }
@@ -3501,9 +3501,9 @@ void CompositorWrapper::getGroupOrder(const Nan::FunctionCallbackInfo<v8::Value>
   int i = 0;
   for (auto& o : order) {
     v8::Local<v8::Object> obj = Nan::New<v8::Object>();
-    obj->Set(Nan::New("val").ToLocalChecked(), Nan::New(o.first));
-    obj->Set(Nan::New("group").ToLocalChecked(), Nan::New(o.second).ToLocalChecked());
-    ret->Set(i, obj);
+    Nan::Set(obj, Nan::New("val").ToLocalChecked(), Nan::New(o.first));
+    Nan::Set(obj, Nan::New("group").ToLocalChecked(), Nan::New(o.second).ToLocalChecked());
+    Nan::Set(ret, i, obj);
     i++;
   }
 
@@ -3516,32 +3516,32 @@ void CompositorWrapper::getGroup(const Nan::FunctionCallbackInfo<v8::Value>& inf
   nullcheck(c->_compositor, "compositor.getGroup");
 
   if (info[0]->IsString()) {
-    v8::String::Utf8Value i0(info[0]->ToString());
+    Nan::Utf8String i0(info[0]);
     string name(*i0);
     Comp::Group g = c->_compositor->getGroup(name);
 
     v8::Local<v8::Object> ret = Nan::New<v8::Object>();
-    ret->Set(Nan::New("name").ToLocalChecked(), Nan::New(g._name).ToLocalChecked());
-    ret->Set(Nan::New("readOnly").ToLocalChecked(), Nan::New(g._readOnly));
+    Nan::Set(ret, Nan::New("name").ToLocalChecked(), Nan::New(g._name).ToLocalChecked());
+    Nan::Set(ret, Nan::New("readOnly").ToLocalChecked(), Nan::New(g._readOnly));
 
     v8::Local<v8::Array> layers = Nan::New<v8::Array>();
     int i = 0;
     for (auto& l : g._affectedLayers) {
-      layers->Set(Nan::New(i), Nan::New(l).ToLocalChecked());
+      Nan::Set(layers, Nan::New(i), Nan::New(l).ToLocalChecked());
       i++;
     }
-    ret->Set(Nan::New("affectedLayers").ToLocalChecked(), layers);
+    Nan::Set(ret, Nan::New("affectedLayers").ToLocalChecked(), layers);
 
     v8::Local<v8::Object> effect = Nan::New<v8::Object>();
-    effect->Set(Nan::New("mode").ToLocalChecked(), Nan::New(g._effect._mode));
-    effect->Set(Nan::New("width").ToLocalChecked(), Nan::New(g._effect._width));
+    Nan::Set(effect, Nan::New("mode").ToLocalChecked(), Nan::New(g._effect._mode));
+    Nan::Set(effect, Nan::New("width").ToLocalChecked(), Nan::New(g._effect._width));
 
     v8::Local<v8::Object> rgb = Nan::New<v8::Object>();
-    rgb->Set(Nan::New("r").ToLocalChecked(), Nan::New(g._effect._color._r));
-    rgb->Set(Nan::New("g").ToLocalChecked(), Nan::New(g._effect._color._g));
-    rgb->Set(Nan::New("b").ToLocalChecked(), Nan::New(g._effect._color._b));
-    effect->Set(Nan::New("color").ToLocalChecked(), rgb);
-    ret->Set(Nan::New("effect").ToLocalChecked(), effect);
+    Nan::Set(rgb, Nan::New("r").ToLocalChecked(), Nan::New(g._effect._color._r));
+    Nan::Set(rgb, Nan::New("g").ToLocalChecked(), Nan::New(g._effect._color._g));
+    Nan::Set(rgb, Nan::New("b").ToLocalChecked(), Nan::New(g._effect._color._b));
+    Nan::Set(effect, Nan::New("color").ToLocalChecked(), rgb);
+    Nan::Set(ret, Nan::New("effect").ToLocalChecked(), effect);
 
     info.GetReturnValue().Set(ret);
   }
@@ -3556,14 +3556,14 @@ void CompositorWrapper::setGroupLayers(const Nan::FunctionCallbackInfo<v8::Value
   nullcheck(c->_compositor, "compositor.setGroupLayers");
 
   if (info[0]->IsString() && info[1]->IsArray()) {
-    v8::String::Utf8Value i0(info[0]->ToString());
+    Nan::Utf8String i0(info[0]);
     string group(*i0);
 
     v8::Local<v8::Array> arr = info[1].As<v8::Array>();
 
     set<string> layers;
     for (int i = 0; i < arr->Length(); i++) {
-      v8::String::Utf8Value str(arr->Get(i)->ToString());
+      Nan::Utf8String str(Nan::Get(arr, i).ToLocalChecked());
       layers.insert(string(*str));
     }
 
@@ -3580,10 +3580,10 @@ void CompositorWrapper::layerInGroup(const Nan::FunctionCallbackInfo<v8::Value>&
   nullcheck(c->_compositor, "compositor.layerInGroup");
 
   if (info[0]->IsString() && info[1]->IsString()) {
-    v8::String::Utf8Value i0(info[0]->ToString());
+    Nan::Utf8String i0(info[0]);
     string layer(*i0);
 
-    v8::String::Utf8Value i1(info[1]->ToString());
+    Nan::Utf8String i1(info[1]);
     string group(*i1);
 
     info.GetReturnValue().Set(Nan::New(c->_compositor->layerInGroup(layer, group)));
@@ -3599,7 +3599,7 @@ void CompositorWrapper::isGroup(const Nan::FunctionCallbackInfo<v8::Value>& info
   nullcheck(c->_compositor, "compositor.isGroup");
 
   if (info[0]->IsString()) {
-    v8::String::Utf8Value i0(info[0]->ToString());
+    Nan::Utf8String i0(info[0]);
     string group(*i0);
 
     info.GetReturnValue().Set(Nan::New(c->_compositor->isGroup(group)));
@@ -3618,16 +3618,16 @@ void CompositorWrapper::renderUpToLayer(const Nan::FunctionCallbackInfo<v8::Valu
     }
     ContextWrapper* ctx = Nan::ObjectWrap::Unwrap<ContextWrapper>(maybe1.ToLocalChecked());
 
-    v8::String::Utf8Value i1(info[1]->ToString());
+    Nan::Utf8String i1(info[1]);
     string layer(*i1);
-    v8::String::Utf8Value i2(info[2]->ToString());
+    Nan::Utf8String i2(info[2]);
     string precomp(*i2);
 
-    float dim = info[3]->NumberValue();
+    float dim = Nan::To<double>(info[3]).ToChecked();
     
     string size = "full";
     if (info[4]->IsString()) {
-      v8::String::Utf8Value i3(info[3]->ToString());
+      Nan::Utf8String i3(info[3]);
       size = string(*i3);
     }
 
@@ -3656,14 +3656,14 @@ void CompositorWrapper::asyncRenderUpToLayer(const Nan::FunctionCallbackInfo<v8:
     }
     ContextWrapper* ctx = Nan::ObjectWrap::Unwrap<ContextWrapper>(maybe1.ToLocalChecked());
 
-    v8::String::Utf8Value i1(info[1]->ToString());
+    Nan::Utf8String i1(info[1]);
     string layer(*i1);
-    v8::String::Utf8Value i2(info[2]->ToString());
+    Nan::Utf8String i2(info[2]);
     string pc(*i2);
 
-    float dim = info[3]->NumberValue();
+    float dim = Nan::To<double>(info[3]).ToChecked();
 
-    v8::String::Utf8Value i3(info[4]->ToString());
+    Nan::Utf8String i3(info[4]);
     string size(*i3);
 
     Nan::Callback* callback = new Nan::Callback(info[5].As<v8::Function>());
@@ -3683,7 +3683,7 @@ void CompositorWrapper::getFlatLayerOrder(const Nan::FunctionCallbackInfo<v8::Va
   v8::Local<v8::Array> ret = Nan::New<v8::Array>();
 
   for (int i = 0; i < order.size(); i++) {
-    ret->Set(i, Nan::New(order[i]).ToLocalChecked());
+    Nan::Set(ret, i, Nan::New(order[i]).ToLocalChecked());
   }
 
   info.GetReturnValue().Set(ret);
@@ -3695,13 +3695,13 @@ void CompositorWrapper::getModifierOrder(const Nan::FunctionCallbackInfo<v8::Val
   nullcheck(c->_compositor, "compositor.getModifierOrder");
 
   if (info[0]->IsString()) {
-    v8::String::Utf8Value i0(info[0]->ToString());
+    Nan::Utf8String i0(info[0]);
 
     vector<string> order = c->_compositor->getModifierOrder(string(*i0));
     v8::Local<v8::Array> ret = Nan::New<v8::Array>();
 
     for (int i = 0; i < order.size(); i++) {
-      ret->Set(i, Nan::New(order[i]).ToLocalChecked());
+      Nan::Set(ret, i, Nan::New(order[i]).ToLocalChecked());
     }
 
     info.GetReturnValue().Set(ret);
@@ -3718,8 +3718,8 @@ void CompositorWrapper::offsetLayer(const Nan::FunctionCallbackInfo<v8::Value>& 
   nullcheck(c->_compositor, "compositor.offsetLayer");
 
   if (info[0]->IsString() && info[1]->IsNumber() && info[2]->IsNumber()) {
-    v8::String::Utf8Value i0(info[0]->ToString());
-    c->_compositor->offsetLayer(string(*i0), info[1]->NumberValue(), info[2]->NumberValue());
+    Nan::Utf8String i0(info[0]);
+    c->_compositor->offsetLayer(string(*i0), Nan::To<double>(info[1]).ToChecked(), Nan::To<double>(info[2]).ToChecked());
   }
   else {
     Nan::ThrowError("offsetLayer(string, float, float) argument error");
@@ -3732,7 +3732,7 @@ void CompositorWrapper::resetLayerOffset(const Nan::FunctionCallbackInfo<v8::Val
   nullcheck(c->_compositor, "compositor.offsetLayer");
 
   if (info[0]->IsString()) {
-    v8::String::Utf8Value i0(info[0]->ToString());
+    Nan::Utf8String i0(info[0]);
     c->_compositor->resetLayerOffset(string(*i0));
   }
   else {
@@ -3752,17 +3752,17 @@ void CompositorWrapper::layerHistogramIntersect(const Nan::FunctionCallbackInfo<
     }
     ContextWrapper* ctx = Nan::ObjectWrap::Unwrap<ContextWrapper>(maybe1.ToLocalChecked());
 
-    v8::String::Utf8Value i0(info[1]->ToString());
-    v8::String::Utf8Value i1(info[2]->ToString());
+    Nan::Utf8String i0(info[1]);
+    Nan::Utf8String i1(info[2]);
 
     float binSize = 0.05;
     if (info[3]->IsNumber()) {
-      binSize = info[3]->NumberValue();
+      binSize = Nan::To<double>(info[3]).ToChecked();
     }
 
     string size = "full";
     if (info[4]->IsString()) {
-      v8::String::Utf8Value i3(info[4]->ToString());
+      Nan::Utf8String i3(info[4]);
       size = string(*i3);
     }
 
@@ -3792,17 +3792,17 @@ void CompositorWrapper::propLayerHistogramIntersect(const Nan::FunctionCallbackI
     }
     ContextWrapper* ctx = Nan::ObjectWrap::Unwrap<ContextWrapper>(maybe1.ToLocalChecked());
 
-    v8::String::Utf8Value i0(info[1]->ToString());
-    v8::String::Utf8Value i1(info[2]->ToString());
+    Nan::Utf8String i0(info[1]);
+    Nan::Utf8String i1(info[2]);
 
     float binSize = 0.05;
     if (info[3]->IsNumber()) {
-      binSize = info[3]->NumberValue();
+      binSize = Nan::To<double>(info[3]).ToChecked();
     }
 
     string size = "full";
     if (info[4]->IsString()) {
-      v8::String::Utf8Value i3(info[4]->ToString());
+      Nan::Utf8String i3(info[4]);
       size = string(*i3);
     }
 
@@ -3832,7 +3832,7 @@ void CompositorWrapper::getGroupInclusionMap(const Nan::FunctionCallbackInfo<v8:
     }
     ImageWrapper* ctx = Nan::ObjectWrap::Unwrap<ImageWrapper>(maybe1.ToLocalChecked());
 
-    v8::String::Utf8Value i1(info[1]->ToString());
+    Nan::Utf8String i1(info[1]);
 
     Comp::Image* img = c->_compositor->getGroupInclusionMap(ctx->_image, string(*i1));
 
@@ -3860,13 +3860,13 @@ void CompositorWrapper::renderOnlyLayer(const Nan::FunctionCallbackInfo<v8::Valu
     }
     ContextWrapper* ctx = Nan::ObjectWrap::Unwrap<ContextWrapper>(maybe1.ToLocalChecked());
 
-    v8::String::Utf8Value i1(info[1]->ToString());
+    Nan::Utf8String i1(info[1]);
     string layer(*i1);
 
     string size = "";
 
     if (info[2]->IsString()) {
-      v8::String::Utf8Value i2(info[2]->ToString());
+      Nan::Utf8String i2(info[2]);
       size = string(*i2);
     }
 
@@ -3966,8 +3966,8 @@ void ClickMapWrapper::Init(v8::Local<v8::Object> exports)
   Nan::SetPrototypeMethod(tpl, "visualize", visualize);
   Nan::SetPrototypeMethod(tpl, "active", active);
 
-  clickMapConstructor.Reset(tpl->GetFunction());
-  exports->Set(Nan::New("ClickMap").ToLocalChecked(), tpl->GetFunction());
+  clickMapConstructor.Reset(Nan::GetFunction(tpl).ToLocalChecked());
+  Nan::Set(exports, Nan::New("ClickMap").ToLocalChecked(), Nan::GetFunction(tpl).ToLocalChecked());
 }
 
 ClickMapWrapper::ClickMapWrapper(Comp::ClickMap* clmap) : _map(clmap) {
@@ -3998,7 +3998,7 @@ void ClickMapWrapper::init(const Nan::FunctionCallbackInfo<v8::Value>& info)
   nullcheck(c->_map, "ClickMap.init");
 
   if (info[0]->IsNumber() && info[1]->IsBoolean()) {
-    c->_map->init(info[0]->NumberValue(), info[1]->BooleanValue());
+    c->_map->init(Nan::To<double>(info[0]).ToChecked(), Nan::To<bool>(info[1]).ToChecked());
   }
   else {
     Nan::ThrowError("ClickMap.init(float, bool) argument error");
@@ -4048,7 +4048,7 @@ void ClickMapWrapper::active(const Nan::FunctionCallbackInfo<v8::Value>& info)
     v8::Local<v8::Array> ret = Nan::New<v8::Array>();
 
     for (int i = 0; i < names.size(); i++) {
-      ret->Set(i, Nan::New(names[i]).ToLocalChecked());
+      Nan::Set(ret, i, Nan::New(names[i]).ToLocalChecked());
     }
 
     info.GetReturnValue().Set(ret);
@@ -4079,8 +4079,8 @@ void ModelWrapper::Init(v8::Local<v8::Object> exports)
   Nan::SetPrototypeMethod(tpl, "exportSliderGraph", exportSliderGraph);
   Nan::SetPrototypeMethod(tpl, "addSliderFromExamples", addSliderFromExamples);
 
-  modelConstructor.Reset(tpl->GetFunction());
-  exports->Set(Nan::New("Model").ToLocalChecked(), tpl->GetFunction());
+  modelConstructor.Reset(Nan::GetFunction(tpl).ToLocalChecked());
+  Nan::Set(exports, Nan::New("Model").ToLocalChecked(), Nan::GetFunction(tpl).ToLocalChecked());
 }
 
 ModelWrapper::ModelWrapper() : _model(nullptr)
@@ -4122,17 +4122,17 @@ void ModelWrapper::analyze(const Nan::FunctionCallbackInfo<v8::Value>& info)
     map<string, vector<string>> analysisData;
     auto keys = data->GetOwnPropertyNames();
     for (int i = 0; i < keys->Length(); i++) {
-      v8::Local<v8::Array> filenames = data->Get(keys->Get(i)).As<v8::Array>();
+      v8::Local<v8::Array> filenames = data->Get(Nan::Get(keys, i).ToLocalChecked()).As<v8::Array>();
 
       vector<string> files;
       for (int j = 0; j < filenames->Length(); j++) {
-        v8::String::Utf8Value val0(filenames->Get(j)->ToString());
+        Nan::Utf8String val0(Nan::Get(filenames, j).ToLocalChecked());
         string file(*val0);
 
         files.push_back(file);
       }
 
-      v8::String::Utf8Value axisName(keys->Get(i)->ToString());
+      Nan::Utf8String axisName(Nan::Get(keys, i).ToLocalChecked());
       string axis(*axisName);
 
       analysisData[axis] = files;
@@ -4161,25 +4161,25 @@ void ModelWrapper::report(const Nan::FunctionCallbackInfo<v8::Value>& info)
       // extract param info for each active parameter
       v8::Local<v8::Object> paramData = Nan::New<v8::Object>();
 
-      paramData->Set(Nan::New("layerName").ToLocalChecked(), Nan::New(y.second._name).ToLocalChecked());
-      paramData->Set(Nan::New("paramName").ToLocalChecked(), Nan::New(y.second._param).ToLocalChecked());
-      paramData->Set(Nan::New("adjustmentType").ToLocalChecked(), Nan::New(y.second._type));
-      paramData->Set(Nan::New("min").ToLocalChecked(), Nan::New(y.second._min));
-      paramData->Set(Nan::New("max").ToLocalChecked(), Nan::New(y.second._max));
+      Nan::Set(paramData, Nan::New("layerName").ToLocalChecked(), Nan::New(y.second._name).ToLocalChecked());
+      Nan::Set(paramData, Nan::New("paramName").ToLocalChecked(), Nan::New(y.second._param).ToLocalChecked());
+      Nan::Set(paramData, Nan::New("adjustmentType").ToLocalChecked(), Nan::New(y.second._type));
+      Nan::Set(paramData, Nan::New("min").ToLocalChecked(), Nan::New(y.second._min));
+      Nan::Set(paramData, Nan::New("max").ToLocalChecked(), Nan::New(y.second._max));
 
       // value array
       v8::Local<v8::Array> valArray = Nan::New<v8::Array>();
       for (int i = 0; i < y.second._vals.size(); i++) {
-        valArray->Set(i, Nan::New(y.second._vals[i]));
+        Nan::Set(valArray, i, Nan::New(y.second._vals[i]));
       }
 
-      paramData->Set(Nan::New("vals").ToLocalChecked(), valArray);
+      Nan::Set(paramData, Nan::New("vals").ToLocalChecked(), valArray);
 
       // add the parameter info the the axis object
-      axisData->Set(Nan::New(y.first).ToLocalChecked(), paramData);
+      Nan::Set(axisData, Nan::New(y.first).ToLocalChecked(), paramData);
     }
 
-    rep->Set(Nan::New(name).ToLocalChecked(), axisData);
+    Nan::Set(rep, Nan::New(name).ToLocalChecked(), axisData);
   }
 
   info.GetReturnValue().Set(rep);
@@ -4211,12 +4211,12 @@ void ModelWrapper::nonParametricSample(const Nan::FunctionCallbackInfo<v8::Value
   v8::Local<v8::Array> props = axisData->GetOwnPropertyNames();
   
   for (int i = 0; i < props->Length(); i++) {
-    Nan::MaybeLocal<v8::Object> maybe1 = Nan::To<v8::Object>(axisData->Get(props->Get(i)));
+    Nan::MaybeLocal<v8::Object> maybe1 = Nan::To<v8::Object>(axisData->Get(Nan::Get(props, i).ToLocalChecked()));
     if (maybe1.IsEmpty()) {
       continue;
     }
     ContextWrapper* c = Nan::ObjectWrap::Unwrap<ContextWrapper>(maybe1.ToLocalChecked());
-    v8::String::Utf8Value prop(props->Get(i)->ToString());
+    Nan::Utf8String prop(Nan::Get(props, i).ToLocalChecked());
     string propName(*prop);
 
     axes[propName] = c->_context;
@@ -4224,7 +4224,7 @@ void ModelWrapper::nonParametricSample(const Nan::FunctionCallbackInfo<v8::Value
 
   float alpha = 1;
   if (info[1]->IsNumber()) {
-    alpha = info[1]->NumberValue();
+    alpha = Nan::To<double>(info[1]).ToChecked();
   }
 
   int k = -1;
@@ -4248,7 +4248,7 @@ void ModelWrapper::addSchema(const Nan::FunctionCallbackInfo<v8::Value>& info)
   nullcheck(m->_model, "model.addSchema");
 
   if (info[0]->IsString()) {
-    v8::String::Utf8Value val0(info[0]->ToString());
+    Nan::Utf8String val0(info[0]);
     string file(*val0);
 
     m->_model->addSchema(file);
@@ -4274,43 +4274,43 @@ void ModelWrapper::schemaSample(const Nan::FunctionCallbackInfo<v8::Value>& info
   v8::Local<v8::Array> i1 = info[1].As<v8::Array>();
   vector<Comp::AxisConstraint> ac;
   for (int i = 0; i < i1->Length(); i++) {
-    v8::Local<v8::Object> co = i1->Get(i).As<v8::Object>();
+    v8::Local<v8::Object> co = Nan::Get(i1, i).ToLocalChecked().As<v8::Object>();
     
     Comp::AxisConstraint constraint;
     v8::Local<v8::Array> keys = co->GetOwnPropertyNames();
     for (int j = 0; j < keys->Length(); j++) {
-      v8::String::Utf8Value prop(keys->Get(j)->ToString());
+      Nan::Utf8String prop(Nan::Get(keys, j).ToLocalChecked());
       string propName(*prop);
 
       if (propName == "mode") {
-        constraint._mode = (Comp::AxisConstraintMode)co->Get(keys->Get(j))->Int32Value();
+        constraint._mode = (Comp::AxisConstraintMode)co->Get(Nan::Get(keys, j).ToLocalChecked())->Int32Value();
       }
       else if (propName == "axis") {
-        v8::String::Utf8Value val(co->Get(keys->Get(j))->ToString());
+        Nan::Utf8String val(co->Get(Nan::Get(keys, j).ToLocalChecked()));
         constraint._axis = string(*val);
       }
       else if (propName == "min") {
-        constraint._min = (float)co->Get(keys->Get(j))->NumberValue();
+        constraint._min = (float)co->Get(Nan::Get(keys, j).ToLocalChecked())->NumberValue();
       }
       else if (propName == "max") {
-        constraint._max = (float)co->Get(keys->Get(j))->NumberValue();
+        constraint._max = (float)co->Get(Nan::Get(keys, j).ToLocalChecked())->NumberValue();
       }
       else if (propName == "layer") {
-        v8::String::Utf8Value val(co->Get(keys->Get(j))->ToString());
+        Nan::Utf8String val(co->Get(Nan::Get(keys, j).ToLocalChecked()));
         constraint._layer = string(*val);
       }
       else if (propName == "type") {
-        constraint._type = (Comp::AdjustmentType)co->Get(keys->Get(j))->Int32Value();
+        constraint._type = (Comp::AdjustmentType)co->Get(Nan::Get(keys, j).ToLocalChecked())->Int32Value();
       }
       else if (propName == "param") {
-        v8::String::Utf8Value val(co->Get(keys->Get(j))->ToString());
+        Nan::Utf8String val(co->Get(Nan::Get(keys, j).ToLocalChecked()));
         constraint._param = string(*val);
       }
       else if (propName == "val") {
-        constraint._val = (float)co->Get(keys->Get(j))->NumberValue();
+        constraint._val = (float)co->Get(Nan::Get(keys, j).ToLocalChecked())->NumberValue();
       }
       else if (propName == "tolerance") {
-        constraint._tolerance = (float)co->Get(keys->Get(j))->NumberValue();
+        constraint._tolerance = (float)co->Get(Nan::Get(keys, j).ToLocalChecked())->NumberValue();
       }
     }
 
@@ -4323,7 +4323,7 @@ void ModelWrapper::schemaSample(const Nan::FunctionCallbackInfo<v8::Value>& info
 
   v8::Local<v8::Object> meta = Nan::New<v8::Object>();
   for (auto& axis : axisVals) {
-    meta->Set(Nan::New(axis.first).ToLocalChecked(), Nan::New(axis.second));
+    Nan::Set(meta, Nan::New(axis.first).ToLocalChecked(), Nan::New(axis.second));
   }
 
   const int argc = 1;
@@ -4332,8 +4332,8 @@ void ModelWrapper::schemaSample(const Nan::FunctionCallbackInfo<v8::Value>& info
   v8::Local<v8::Object> ctxInst = Nan::NewInstance(cons, argc, argv).ToLocalChecked();
 
   v8::Local<v8::Object> ret = Nan::New<v8::Object>();
-  ret->Set(Nan::New("context").ToLocalChecked(), ctxInst);
-  ret->Set(Nan::New("metadata").ToLocalChecked(), meta);
+  Nan::Set(ret, Nan::New("context").ToLocalChecked(), ctxInst);
+  Nan::Set(ret, Nan::New("metadata").ToLocalChecked(), meta);
 
   info.GetReturnValue().Set(ret);
 }
@@ -4357,10 +4357,10 @@ void ModelWrapper::getInputData(const Nan::FunctionCallbackInfo<v8::Value>& info
       v8::Local<v8::Function> cons = Nan::New<v8::Function>(ContextWrapper::contextConstructor);
       v8::Local<v8::Object> ctxInst = Nan::NewInstance(cons, argc, argv).ToLocalChecked();
 
-      contexts->Set(i, ctxInst);
+      Nan::Set(contexts, i, ctxInst);
     }
 
-    ret->Set(Nan::New(d.first).ToLocalChecked(), contexts);
+    Nan::Set(ret, Nan::New(d.first).ToLocalChecked(), contexts);
   }
 
   info.GetReturnValue().Set(ret);
@@ -4377,17 +4377,17 @@ void ModelWrapper::addSlider(const Nan::FunctionCallbackInfo<v8::Value>& info)
   vector<shared_ptr<Comp::ParamFunction>> funcs;
 
   if (info[0]->IsString() && info[1]->IsArray()) {
-    v8::String::Utf8Value sliderName(info[0]->ToString());
+    Nan::Utf8String sliderName(info[0]);
     name = string(*sliderName);
 
     v8::Local<v8::Array> paramData = info[1].As<v8::Array>();
     for (int i = 0; i < paramData->Length(); i++) {
-      v8::Local<v8::Object> objData = paramData->Get(i).As<v8::Object>();
+      v8::Local<v8::Object> objData = Nan::Get(paramData, i).ToLocalChecked().As<v8::Object>();
       Comp::LayerParamInfo param;
 
       // looking for specific params
       if (Nan::HasOwnProperty(objData, Nan::New("layerName").ToLocalChecked()).ToChecked()) {
-        v8::String::Utf8Value str(objData->Get(Nan::New("layerName").ToLocalChecked())->ToString());
+        Nan::Utf8String str(Nan::Get(objData, Nan::New("layerName").ToLocalChecked()).ToLocalChecked());
         param._name = string(*str);
       }
       else {
@@ -4395,7 +4395,7 @@ void ModelWrapper::addSlider(const Nan::FunctionCallbackInfo<v8::Value>& info)
       }
 
       if (Nan::HasOwnProperty(objData, Nan::New("param").ToLocalChecked()).ToChecked()) {
-        v8::String::Utf8Value str(objData->Get(Nan::New("param").ToLocalChecked())->ToString());
+        Nan::Utf8String str(Nan::Get(objData, Nan::New("param").ToLocalChecked()).ToLocalChecked());
         param._param = string(*str);
       }
       else {
@@ -4403,14 +4403,14 @@ void ModelWrapper::addSlider(const Nan::FunctionCallbackInfo<v8::Value>& info)
       }
 
       if (Nan::HasOwnProperty(objData, Nan::New("adjustmentType").ToLocalChecked()).ToChecked()) {
-        param._type = (Comp::AdjustmentType)(objData->Get(Nan::New("adjustmentType").ToLocalChecked())->Int32Value());
+        param._type = (Comp::AdjustmentType)(Nan::Get(objData, Nan::New("adjustmentType").ToLocalChecked()).ToLocalChecked()->Int32Value());
       }
       else {
         Nan::ThrowError("Parameter objects must have an adjustmentType field");
       }
 
       // now looking for function data info
-      v8::String::Utf8Value t(excGet(objData, "type")->ToString());
+      Nan::Utf8String t(excGet(objData, "type"));
       string funcType = string(*t);
 
       if (funcType == "dynamicSine") {
@@ -4441,8 +4441,8 @@ void ModelWrapper::addSlider(const Nan::FunctionCallbackInfo<v8::Value>& info)
         auto ya = excGet(objData, "ys").As<v8::Array>();
 
         for (int i = 0; i < xa->Length(); i++) {
-          xs.push_back(xa->Get(i)->NumberValue());
-          ys.push_back(ya->Get(i)->NumberValue());
+          xs.push_back(Nan::Get(xa, i).ToLocalChecked()->NumberValue());
+          ys.push_back(Nan::Get(ya, i).ToLocalChecked()->NumberValue());
         }
 
         shared_ptr<Comp::ParamFunction> func = shared_ptr<Comp::ParamFunction>(new Comp::LinearInterp(xs, ys));
@@ -4472,12 +4472,12 @@ void ModelWrapper::addSliderFromExamples(const Nan::FunctionCallbackInfo<v8::Val
   vector<string> files;
 
   if (info[0]->IsString() && info[1]->IsArray()) {
-    v8::String::Utf8Value sliderName(info[0]->ToString());
+    Nan::Utf8String sliderName(info[0]);
     name = string(*sliderName);
 
     v8::Local<v8::Array> filenames = info[1].As<v8::Array>();
     for (int i = 0; i < filenames->Length(); i++) {
-      v8::String::Utf8Value fname(filenames->Get(i)->ToString());
+      Nan::Utf8String fname(Nan::Get(filenames, i).ToLocalChecked());
       files.push_back(string(*fname));
     }
 
@@ -4503,10 +4503,10 @@ void ModelWrapper::sliderSample(const Nan::FunctionCallbackInfo<v8::Value>& info
   }
   ContextWrapper* c = Nan::ObjectWrap::Unwrap<ContextWrapper>(maybe1.ToLocalChecked());
 
-  v8::String::Utf8Value str(info[1]->ToString());
+  Nan::Utf8String str(info[1]);
   string id = string(*str);
 
-  float val = info[2]->NumberValue();
+  float val = Nan::To<double>(info[2]).ToChecked();
 
   Comp::Context ctx = m->_model->getSlider(id).sample(c->_context, val);
 
@@ -4516,12 +4516,12 @@ void ModelWrapper::sliderSample(const Nan::FunctionCallbackInfo<v8::Value>& info
   v8::Local<v8::Object> ctxInst = Nan::NewInstance(cons, argc, argv).ToLocalChecked();
 
   v8::Local<v8::Object> ret = Nan::New<v8::Object>();
-  ret->Set(Nan::New("context").ToLocalChecked(), ctxInst);
+  Nan::Set(ret, Nan::New("context").ToLocalChecked(), ctxInst);
 
   v8::Local<v8::Object> metadata = Nan::New<v8::Object>();
 
-  metadata->Set(Nan::New(id).ToLocalChecked(), Nan::New(val));
-  ret->Set(Nan::New("metadata").ToLocalChecked(), metadata);
+  Nan::Set(metadata, Nan::New(id).ToLocalChecked(), Nan::New(val));
+  Nan::Set(ret, Nan::New("metadata").ToLocalChecked(), metadata);
 
   info.GetReturnValue().Set(ret);
 }
@@ -4535,10 +4535,10 @@ void ModelWrapper::exportSliderGraph(const Nan::FunctionCallbackInfo<v8::Value>&
     Nan::ThrowError("exportSliderGraph(string, string, [int]) argument error");
   }
 
-  v8::String::Utf8Value str(info[0]->ToString());
+  Nan::Utf8String str(info[0]);
   string id = string(*str);
 
-  v8::String::Utf8Value str2(info[1]->ToString());
+  Nan::Utf8String str2(info[1]);
   string filename = string(*str2);
 
   int n = 1000;
@@ -4567,8 +4567,8 @@ void UISliderWrapper::Init(v8::Local<v8::Object> exports)
   Nan::SetPrototypeMethod(tpl, "type", type);
   Nan::SetPrototypeMethod(tpl, "toJSON", toJSON);
 
-  uiSliderConstructor.Reset(tpl->GetFunction());
-  exports->Set(Nan::New("Slider").ToLocalChecked(), tpl->GetFunction());
+  uiSliderConstructor.Reset(Nan::GetFunction(tpl).ToLocalChecked());
+  Nan::Set(exports, Nan::New("Slider").ToLocalChecked(), Nan::GetFunction(tpl).ToLocalChecked());
 }
 
 UISliderWrapper::UISliderWrapper(Comp::UISlider* s) : _slider(s) {
@@ -4588,10 +4588,10 @@ void UISliderWrapper::New(const Nan::FunctionCallbackInfo<v8::Value>& info)
   Comp::AdjustmentType t;
 
   if (info.Length() == 3) {
-    v8::String::Utf8Value i0(info[0]->ToString());
+    Nan::Utf8String i0(info[0]);
     layer = string(*i0);
 
-    v8::String::Utf8Value i1(info[1]->ToString());
+    Nan::Utf8String i1(info[1]);
     param = string(*i1);
 
     t = (Comp::AdjustmentType)(info[2]->Int32Value());
@@ -4613,13 +4613,13 @@ void UISliderWrapper::New(const Nan::FunctionCallbackInfo<v8::Value>& info)
   else if (info[0]->IsObject()) {
     // json object init
     v8::Local<v8::Object> obj = info[0].As<v8::Object>();
-    v8::String::Utf8Value l(obj->Get(Nan::New("layer").ToLocalChecked())->ToString());
-    v8::String::Utf8Value p(obj->Get(Nan::New("param").ToLocalChecked())->ToString());
-    Comp::AdjustmentType t = (Comp::AdjustmentType)obj->Get(Nan::New("type").ToLocalChecked())->Int32Value();
-    v8::String::Utf8Value dn(obj->Get(Nan::New("displayName").ToLocalChecked())->ToString());
+    Nan::Utf8String l(Nan::Get(obj, Nan::New("layer").ToLocalChecked()).ToLocalChecked());
+    Nan::Utf8String p(Nan::Get(obj, Nan::New("param").ToLocalChecked()).ToLocalChecked());
+    Comp::AdjustmentType t = (Comp::AdjustmentType)Nan::Get(obj, Nan::New("type").ToLocalChecked()).ToLocalChecked()->Int32Value();
+    Nan::Utf8String dn(Nan::Get(obj, Nan::New("displayName").ToLocalChecked()).ToLocalChecked());
 
     Comp::UISlider* i = new Comp::UISlider(string(*l), string(*p), t, string(*dn));
-    i->setVal(obj->Get(Nan::New("value").ToLocalChecked())->NumberValue());
+    i->setVal(Nan::Get(obj, Nan::New("value").ToLocalChecked()).ToLocalChecked()->NumberValue());
 
     UISliderWrapper* sw = new UISliderWrapper(i);
     sw->Wrap(info.This());
@@ -4637,7 +4637,7 @@ void UISliderWrapper::setVal(const Nan::FunctionCallbackInfo<v8::Value>& info)
   nullcheck(s->_slider, "slider.setVal");
 
   if (info[0]->IsNumber()) {
-    float val = info[0]->NumberValue();
+    float val = Nan::To<double>(info[0]).ToChecked();
 
     Nan::MaybeLocal<v8::Object> maybe1 = Nan::To<v8::Object>(info[1]);
     if (maybe1.IsEmpty()) {
@@ -4685,7 +4685,7 @@ void UISliderWrapper::displayName(const Nan::FunctionCallbackInfo<v8::Value>& in
     info.GetReturnValue().Set(Nan::New(s->_slider->_displayName).ToLocalChecked());
   }
   else {
-    v8::String::Utf8Value i0(info[0]->ToString());
+    Nan::Utf8String i0(info[0]);
     s->_slider->_displayName = string(*i0);
   }
 }
@@ -4721,12 +4721,12 @@ void UISliderWrapper::toJSON(const Nan::FunctionCallbackInfo<v8::Value>& info)
 
   v8::Local<v8::Object> ret = Nan::New<v8::Object>();
 
-  ret->Set(Nan::New("layer").ToLocalChecked(), Nan::New(s->_slider->getLayer()).ToLocalChecked());
-  ret->Set(Nan::New("param").ToLocalChecked(), Nan::New(s->_slider->getParam()).ToLocalChecked());
-  ret->Set(Nan::New("type").ToLocalChecked(), Nan::New(s->_slider->getType()));
-  ret->Set(Nan::New("displayName").ToLocalChecked(), Nan::New(s->_slider->_displayName).ToLocalChecked());
-  ret->Set(Nan::New("value").ToLocalChecked(), Nan::New(s->_slider->getVal()));
-  ret->Set(Nan::New("UIType").ToLocalChecked(), Nan::New("Slider").ToLocalChecked());
+  Nan::Set(ret, Nan::New("layer").ToLocalChecked(), Nan::New(s->_slider->getLayer()).ToLocalChecked());
+  Nan::Set(ret, Nan::New("param").ToLocalChecked(), Nan::New(s->_slider->getParam()).ToLocalChecked());
+  Nan::Set(ret, Nan::New("type").ToLocalChecked(), Nan::New(s->_slider->getType()));
+  Nan::Set(ret, Nan::New("displayName").ToLocalChecked(), Nan::New(s->_slider->_displayName).ToLocalChecked());
+  Nan::Set(ret, Nan::New("value").ToLocalChecked(), Nan::New(s->_slider->getVal()));
+  Nan::Set(ret, Nan::New("UIType").ToLocalChecked(), Nan::New("Slider").ToLocalChecked());
 
   info.GetReturnValue().Set(ret);
 }
@@ -4752,8 +4752,8 @@ void UIMetaSliderWrapper::Init(v8::Local<v8::Object> exports)
   Nan::SetPrototypeMethod(tpl, "reassignMax", reassignMax);
   Nan::SetPrototypeMethod(tpl, "toJSON", toJSON);
 
-  uiMetaSliderConstructor.Reset(tpl->GetFunction());
-  exports->Set(Nan::New("MetaSlider").ToLocalChecked(), tpl->GetFunction());
+  uiMetaSliderConstructor.Reset(Nan::GetFunction(tpl).ToLocalChecked());
+  Nan::Set(exports, Nan::New("MetaSlider").ToLocalChecked(), Nan::GetFunction(tpl).ToLocalChecked());
 }
 
 UIMetaSliderWrapper::UIMetaSliderWrapper(Comp::UIMetaSlider* s) : _mSlider(s) {
@@ -4768,7 +4768,7 @@ UIMetaSliderWrapper::~UIMetaSliderWrapper()
 void UIMetaSliderWrapper::New(const Nan::FunctionCallbackInfo<v8::Value>& info)
 {
   if (info[0]->IsString()) {
-    v8::String::Utf8Value i0(info[0]->ToString());
+    Nan::Utf8String i0(info[0]);
     string name(*i0);
 
     Comp::UIMetaSlider* slider = new Comp::UIMetaSlider(name);
@@ -4779,28 +4779,28 @@ void UIMetaSliderWrapper::New(const Nan::FunctionCallbackInfo<v8::Value>& info)
   }
   else if (info[0]->IsObject()) {
     v8::Local<v8::Object> obj = info[0].As<v8::Object>();
-    v8::String::Utf8Value name(obj->Get(Nan::New("displayName").ToLocalChecked())->ToString());
+    Nan::Utf8String name(Nan::Get(obj, Nan::New("displayName").ToLocalChecked()).ToLocalChecked());
 
     Comp::UIMetaSlider* slider = new Comp::UIMetaSlider(string(*name));
 
     // slider loading time
-    v8::Local<v8::Object> sliders = obj->Get(Nan::New("subSliders").ToLocalChecked()).As<v8::Object>();
+    v8::Local<v8::Object> sliders = Nan::Get(obj, Nan::New("subSliders").ToLocalChecked()).ToLocalChecked().As<v8::Object>();
     auto ids = sliders->GetOwnPropertyNames();
     for (int i = 0; i < ids->Length(); i++) {
-      auto sliderObj = sliders->Get(ids->Get(i)).As<v8::Object>();
+      auto sliderObj = sliders->Get(Nan::Get(ids, i).ToLocalChecked()).As<v8::Object>();
 
-      v8::String::Utf8Value layer(sliderObj->Get(Nan::New("layer").ToLocalChecked())->ToString());
-      v8::String::Utf8Value param(sliderObj->Get(Nan::New("param").ToLocalChecked())->ToString());
-      Comp::AdjustmentType t = (Comp::AdjustmentType)sliderObj->Get(Nan::New("type").ToLocalChecked())->Int32Value();
+      Nan::Utf8String layer(Nan::Get(sliderObj, Nan::New("layer").ToLocalChecked()).ToLocalChecked());
+      Nan::Utf8String param(Nan::Get(sliderObj, Nan::New("param").ToLocalChecked()).ToLocalChecked());
+      Comp::AdjustmentType t = (Comp::AdjustmentType)Nan::Get(sliderObj, Nan::New("type").ToLocalChecked()).ToLocalChecked()->Int32Value();
 
       vector<float> xs;
       vector<float> ys;
-      auto xsa = sliderObj->Get(Nan::New("xs").ToLocalChecked()).As<v8::Array>();
-      auto ysa = sliderObj->Get(Nan::New("ys").ToLocalChecked()).As<v8::Array>();
+      auto xsa = Nan::Get(sliderObj, Nan::New("xs").ToLocalChecked()).ToLocalChecked().As<v8::Array>();
+      auto ysa = Nan::Get(sliderObj, Nan::New("ys").ToLocalChecked()).ToLocalChecked().As<v8::Array>();
 
       for (int i = 0; i < xsa->Length(); i++) {
-        xs.push_back(xsa->Get(i)->NumberValue());
-        ys.push_back(ysa->Get(i)->NumberValue());
+        xs.push_back(Nan::Get(xsa, i).ToLocalChecked()->NumberValue());
+        ys.push_back(Nan::Get(ysa, i).ToLocalChecked()->NumberValue());
       }
 
       slider->addSlider(string(*layer), string(*param), t, xs, ys);
@@ -4822,10 +4822,10 @@ void UIMetaSliderWrapper::addSlider(const Nan::FunctionCallbackInfo<v8::Value>& 
   nullcheck(s->_mSlider, "MetaSlider.addSlider");
 
   if (info.Length() == 5) {
-    v8::String::Utf8Value i0(info[0]->ToString());
+    Nan::Utf8String i0(info[0]);
     string layer(*i0);
 
-    v8::String::Utf8Value i1(info[1]->ToString());
+    Nan::Utf8String i1(info[1]);
     string param(*i1);
 
     Comp::AdjustmentType t = (Comp::AdjustmentType)(info[2]->Int32Value());
@@ -4843,8 +4843,8 @@ void UIMetaSliderWrapper::addSlider(const Nan::FunctionCallbackInfo<v8::Value>& 
       }
 
       for (int i = 0; i < xsr->Length(); i++) {
-        xs.push_back(xsr->Get(i)->NumberValue());
-        ys.push_back(ysr->Get(i)->NumberValue());
+        xs.push_back(Nan::Get(xsr, i).ToLocalChecked()->NumberValue());
+        ys.push_back(Nan::Get(ysr, i).ToLocalChecked()->NumberValue());
       }
 
       string sliderName = s->_mSlider->addSlider(layer, param, t, xs, ys);
@@ -4852,8 +4852,8 @@ void UIMetaSliderWrapper::addSlider(const Nan::FunctionCallbackInfo<v8::Value>& 
     }
     // or min/max floats
     else {
-      float min = info[3]->NumberValue();
-      float max = info[4]->NumberValue();
+      float min = Nan::To<double>(info[3]).ToChecked();
+      float max = Nan::To<double>(info[4]).ToChecked();
 
       string sliderName = s->_mSlider->addSlider(layer, param, t, min, max);
       info.GetReturnValue().Set(Nan::New(sliderName).ToLocalChecked());
@@ -4870,7 +4870,7 @@ void UIMetaSliderWrapper::getSlider(const Nan::FunctionCallbackInfo<v8::Value>& 
   nullcheck(s->_mSlider, "MetaSlider.getSlider");
 
   if (info[0]->IsString()) {
-    v8::String::Utf8Value i0(info[0]->ToString());
+    Nan::Utf8String i0(info[0]);
     string id(*i0);
 
     Comp::UISlider* slider = s->_mSlider->getSlider(id);
@@ -4908,7 +4908,7 @@ void UIMetaSliderWrapper::names(const Nan::FunctionCallbackInfo<v8::Value>& info
   vector<string> names = s->_mSlider->names();
 
   for (int i = 0; i < names.size(); i++) {
-    ret->Set(i, Nan::New(names[i]).ToLocalChecked());
+    Nan::Set(ret, i, Nan::New(names[i]).ToLocalChecked());
   }
 
   info.GetReturnValue().Set(ret);
@@ -4920,7 +4920,7 @@ void UIMetaSliderWrapper::deleteSlider(const Nan::FunctionCallbackInfo<v8::Value
   nullcheck(s->_mSlider, "MetaSlider.deleteSlider");
 
   if (info[0]->IsString()) {
-    v8::String::Utf8Value i0(info[0]->ToString());
+    Nan::Utf8String i0(info[0]);
     string id(*i0);
 
     s->_mSlider->deleteSlider(id);
@@ -4933,7 +4933,7 @@ void UIMetaSliderWrapper::setPoints(const Nan::FunctionCallbackInfo<v8::Value>& 
   nullcheck(s->_mSlider, "MetaSlider.setPoints");
 
   if (info.Length() == 3) {
-    v8::String::Utf8Value i0(info[0]->ToString());
+    Nan::Utf8String i0(info[0]);
     string id(*i0);
 
     vector<float> xs;
@@ -4945,8 +4945,8 @@ void UIMetaSliderWrapper::setPoints(const Nan::FunctionCallbackInfo<v8::Value>& 
 
       if (a1->Length() == a2->Length()) {
         for (int i = 0; i < a1->Length(); i++) {
-          xs.push_back(a1->Get(i)->NumberValue());
-          ys.push_back(a2->Get(i)->NumberValue());
+          xs.push_back(Nan::Get(a1, i).ToLocalChecked()->NumberValue());
+          ys.push_back(Nan::Get(a2, i).ToLocalChecked()->NumberValue());
         }
 
         s->_mSlider->setPoints(id, xs, ys);
@@ -4970,7 +4970,7 @@ void UIMetaSliderWrapper::setContext(const Nan::FunctionCallbackInfo<v8::Value>&
   nullcheck(s->_mSlider, "MetaSlider.setContext");
 
   if (info.Length() == 2) {
-    float val = info[0]->NumberValue();
+    float val = Nan::To<double>(info[0]).ToChecked();
 
     Nan::MaybeLocal<v8::Object> maybe1 = Nan::To<v8::Object>(info[1]);
     if (maybe1.IsEmpty()) {
@@ -4988,8 +4988,8 @@ void UIMetaSliderWrapper::setContext(const Nan::FunctionCallbackInfo<v8::Value>&
     info.GetReturnValue().Set(ctxInst);
   }
   else if (info.Length() == 3) {
-    float val = info[0]->NumberValue();
-    float scale = info[1]->NumberValue();
+    float val = Nan::To<double>(info[0]).ToChecked();
+    float scale = Nan::To<double>(info[1]).ToChecked();
 
     Nan::MaybeLocal<v8::Object> maybe1 = Nan::To<v8::Object>(info[2]);
     if (maybe1.IsEmpty()) {
@@ -5017,7 +5017,7 @@ void UIMetaSliderWrapper::displayName(const Nan::FunctionCallbackInfo<v8::Value>
   nullcheck(s->_mSlider, "MetaSlider.displayName");
 
   if (info[0]->IsString()) {
-    v8::String::Utf8Value i0(info[0]->ToString());
+    Nan::Utf8String i0(info[0]);
     string name(*i0);
 
     s->_mSlider->_displayName = name;
@@ -5057,9 +5057,9 @@ void UIMetaSliderWrapper::toJSON(const Nan::FunctionCallbackInfo<v8::Value>& inf
   v8::Local<v8::Object> ret = Nan::New<v8::Object>();
 
   // metaslider info
-  ret->Set(Nan::New("displayName").ToLocalChecked(), Nan::New(s->_mSlider->_displayName).ToLocalChecked());
-  ret->Set(Nan::New("value").ToLocalChecked(), Nan::New(s->_mSlider->getVal()));
-  ret->Set(Nan::New("UIType").ToLocalChecked(), Nan::New("MetaSlider").ToLocalChecked());
+  Nan::Set(ret, Nan::New("displayName").ToLocalChecked(), Nan::New(s->_mSlider->_displayName).ToLocalChecked());
+  Nan::Set(ret, Nan::New("value").ToLocalChecked(), Nan::New(s->_mSlider->getVal()));
+  Nan::Set(ret, Nan::New("UIType").ToLocalChecked(), Nan::New("MetaSlider").ToLocalChecked());
 
   v8::Local<v8::Object> sliders = Nan::New<v8::Object>();
   // slider data extraction
@@ -5068,25 +5068,25 @@ void UIMetaSliderWrapper::toJSON(const Nan::FunctionCallbackInfo<v8::Value>& inf
     Comp::UISlider* slider = s->_mSlider->getSlider(name);
     auto func = s->_mSlider->getFunc(name);
 
-    sld->Set(Nan::New("layer").ToLocalChecked(), Nan::New(slider->getLayer()).ToLocalChecked());
-    sld->Set(Nan::New("param").ToLocalChecked(), Nan::New(slider->getParam()).ToLocalChecked());
-    sld->Set(Nan::New("type").ToLocalChecked(), Nan::New(slider->getType()));
+    Nan::Set(sld, Nan::New("layer").ToLocalChecked(), Nan::New(slider->getLayer()).ToLocalChecked());
+    Nan::Set(sld, Nan::New("param").ToLocalChecked(), Nan::New(slider->getParam()).ToLocalChecked());
+    Nan::Set(sld, Nan::New("type").ToLocalChecked(), Nan::New(slider->getType()));
 
     // points
     v8::Local<v8::Array> xs = Nan::New<v8::Array>();
     v8::Local<v8::Array> ys = Nan::New<v8::Array>();
 
     for (int i = 0; i < func->_xs.size(); i++) {
-      xs->Set(i, Nan::New(func->_xs[i]));
-      ys->Set(i, Nan::New(func->_ys[i]));
+      Nan::Set(xs, i, Nan::New(func->_xs[i]));
+      Nan::Set(ys, i, Nan::New(func->_ys[i]));
     }
 
-    sld->Set(Nan::New("xs").ToLocalChecked(), xs);
-    sld->Set(Nan::New("ys").ToLocalChecked(), ys);
+    Nan::Set(sld, Nan::New("xs").ToLocalChecked(), xs);
+    Nan::Set(sld, Nan::New("ys").ToLocalChecked(), ys);
 
-    sliders->Set(Nan::New(name).ToLocalChecked(), sld);
+    Nan::Set(sliders, Nan::New(name).ToLocalChecked(), sld);
   }
-  ret->Set(Nan::New("subSliders").ToLocalChecked(), sliders);
+  Nan::Set(ret, Nan::New("subSliders").ToLocalChecked(), sliders);
 
   info.GetReturnValue().Set(ret);
 }
@@ -5108,8 +5108,8 @@ void UISamplerWrapper::Init(v8::Local<v8::Object> exports)
   Nan::SetPrototypeMethod(tpl, "displayName", displayName);
   Nan::SetPrototypeMethod(tpl, "toJSON", toJSON);
 
-  uiSamplerConstructor.Reset(tpl->GetFunction());
-  exports->Set(Nan::New("Sampler").ToLocalChecked(), tpl->GetFunction());
+  uiSamplerConstructor.Reset(Nan::GetFunction(tpl).ToLocalChecked());
+  Nan::Set(exports, Nan::New("Sampler").ToLocalChecked(), Nan::GetFunction(tpl).ToLocalChecked());
 }
 
 UISamplerWrapper::UISamplerWrapper(Comp::UISampler* s) {
@@ -5124,7 +5124,7 @@ UISamplerWrapper::~UISamplerWrapper()
 void UISamplerWrapper::New(const Nan::FunctionCallbackInfo<v8::Value>& info)
 {
   if (info[0]->IsString()) {
-    v8::String::Utf8Value i0(info[0]->ToString());
+    Nan::Utf8String i0(info[0]);
     string name(*i0);
 
     Comp::UISampler* slider = new Comp::UISampler(name);
@@ -5136,22 +5136,22 @@ void UISamplerWrapper::New(const Nan::FunctionCallbackInfo<v8::Value>& info)
   else if (info[0]->IsObject()) {
     v8::Local<v8::Object> obj = info[0].As<v8::Object>();
 
-    v8::String::Utf8Value dn(obj->Get(Nan::New("displayName").ToLocalChecked())->ToString());
-    Comp::AxisEvalFuncType type = (Comp::AxisEvalFuncType)obj->Get(Nan::New("objEvalMode").ToLocalChecked())->Int32Value();
+    Nan::Utf8String dn(Nan::Get(obj, Nan::New("displayName").ToLocalChecked()).ToLocalChecked());
+    Comp::AxisEvalFuncType type = (Comp::AxisEvalFuncType)Nan::Get(obj, Nan::New("objEvalMode").ToLocalChecked()).ToLocalChecked()->Int32Value();
 
     Comp::UISampler* sampler = new Comp::UISampler(string(*dn));
     sampler->setObjectiveMode(type);
 
     // params
-    v8::Local<v8::Object> params = obj->Get(Nan::New("params").ToLocalChecked()).As<v8::Object>();
+    v8::Local<v8::Object> params = Nan::Get(obj, Nan::New("params").ToLocalChecked()).ToLocalChecked().As<v8::Object>();
     auto names = params->GetOwnPropertyNames();
     for (int i = 0; i < names->Length(); i++) {
-      v8::Local<v8::Object> p = params->Get(names->Get(i)).As<v8::Object>();
+      v8::Local<v8::Object> p = params->Get(Nan::Get(names, i).ToLocalChecked()).As<v8::Object>();
       Comp::LayerParamInfo inf;
 
-      v8::String::Utf8Value layer(p->Get(Nan::New("layer").ToLocalChecked())->ToString());
-      v8::String::Utf8Value param(p->Get(Nan::New("param").ToLocalChecked())->ToString());
-      Comp::AdjustmentType t = (Comp::AdjustmentType)p->Get(Nan::New("type").ToLocalChecked())->Int32Value();
+      Nan::Utf8String layer(Nan::Get(p, Nan::New("layer").ToLocalChecked()).ToLocalChecked());
+      Nan::Utf8String param(Nan::Get(p, Nan::New("param").ToLocalChecked()).ToLocalChecked());
+      Comp::AdjustmentType t = (Comp::AdjustmentType)Nan::Get(p, Nan::New("type").ToLocalChecked()).ToLocalChecked()->Int32Value();
 
       inf._name = string(*layer);
       inf._param = string(*param);
@@ -5177,7 +5177,7 @@ void UISamplerWrapper::displayName(const Nan::FunctionCallbackInfo<v8::Value>& i
   nullcheck(s->_sampler, "Sampler.displayName");
 
   if (info[0]->IsString()) {
-    v8::String::Utf8Value i0(info[0]->ToString());
+    Nan::Utf8String i0(info[0]);
     string name(*i0);
 
     s->_sampler->_displayName = name;
@@ -5193,10 +5193,10 @@ void UISamplerWrapper::addParam(const Nan::FunctionCallbackInfo<v8::Value>& info
   nullcheck(s->_sampler, "Sampler.addParam");
 
   if (info.Length() == 3) {
-    v8::String::Utf8Value i0(info[0]->ToString());
+    Nan::Utf8String i0(info[0]);
     string layer(*i0);
 
-    v8::String::Utf8Value i1(info[1]->ToString());
+    Nan::Utf8String i1(info[1]);
     string param(*i1);
 
     Comp::AdjustmentType t = (Comp::AdjustmentType)(info[2]->Int32Value());
@@ -5217,7 +5217,7 @@ void UISamplerWrapper::deleteParam(const Nan::FunctionCallbackInfo<v8::Value>& i
   nullcheck(s->_sampler, "Sampler.deleteParam");
 
   if (info[0]->IsString()) {
-    v8::String::Utf8Value i0(info[0]->ToString());
+    Nan::Utf8String i0(info[0]);
     string id(*i0);
 
     s->_sampler->deleteParam(id);
@@ -5233,7 +5233,7 @@ void UISamplerWrapper::params(const Nan::FunctionCallbackInfo<v8::Value>& info)
   vector<string> names = s->_sampler->params();
 
   for (int i = 0; i < names.size(); i++) {
-    ret->Set(i, Nan::New(names[i]).ToLocalChecked());
+    Nan::Set(ret, i, Nan::New(names[i]).ToLocalChecked());
   }
 
   info.GetReturnValue().Set(ret);
@@ -5245,7 +5245,7 @@ void UISamplerWrapper::sample(const Nan::FunctionCallbackInfo<v8::Value>& info)
   nullcheck(s->_sampler, "Sampler.sample");
 
   if (info.Length() == 2) {
-    float val = info[0]->NumberValue();
+    float val = Nan::To<double>(info[0]).ToChecked();
 
     Nan::MaybeLocal<v8::Object> maybe1 = Nan::To<v8::Object>(info[1]);
     if (maybe1.IsEmpty()) {
@@ -5293,9 +5293,9 @@ void UISamplerWrapper::toJSON(const Nan::FunctionCallbackInfo<v8::Value>& info)
 
   v8::Local<v8::Object> ret = Nan::New<v8::Object>();
 
-  ret->Set(Nan::New("displayName").ToLocalChecked(), Nan::New(s->_sampler->_displayName).ToLocalChecked());
-  ret->Set(Nan::New("objEvalMode").ToLocalChecked(), Nan::New(s->_sampler->getEvalMode()));
-  ret->Set(Nan::New("UIType").ToLocalChecked(), Nan::New("Sampler").ToLocalChecked());
+  Nan::Set(ret, Nan::New("displayName").ToLocalChecked(), Nan::New(s->_sampler->_displayName).ToLocalChecked());
+  Nan::Set(ret, Nan::New("objEvalMode").ToLocalChecked(), Nan::New(s->_sampler->getEvalMode()));
+  Nan::Set(ret, Nan::New("UIType").ToLocalChecked(), Nan::New("Sampler").ToLocalChecked());
 
   // parameter dump
   vector<string> ids = s->_sampler->params();
@@ -5305,14 +5305,14 @@ void UISamplerWrapper::toJSON(const Nan::FunctionCallbackInfo<v8::Value>& info)
     Comp::LayerParamInfo info = s->_sampler->getParamInfo(id);
 
     v8::Local<v8::Object> pinfo = Nan::New<v8::Object>();
-    pinfo->Set(Nan::New("layer").ToLocalChecked(), Nan::New(info._name).ToLocalChecked());
-    pinfo->Set(Nan::New("param").ToLocalChecked(), Nan::New(info._param).ToLocalChecked());
-    pinfo->Set(Nan::New("type").ToLocalChecked(), Nan::New(info._type));
+    Nan::Set(pinfo, Nan::New("layer").ToLocalChecked(), Nan::New(info._name).ToLocalChecked());
+    Nan::Set(pinfo, Nan::New("param").ToLocalChecked(), Nan::New(info._param).ToLocalChecked());
+    Nan::Set(pinfo, Nan::New("type").ToLocalChecked(), Nan::New(info._type));
 
-    params->Set(Nan::New(id).ToLocalChecked(), pinfo);
+    Nan::Set(params, Nan::New(id).ToLocalChecked(), pinfo);
   }
 
-  ret->Set(Nan::New("params").ToLocalChecked(), params);
+  Nan::Set(ret, Nan::New("params").ToLocalChecked(), params);
 
   info.GetReturnValue().Set(ret);
 }

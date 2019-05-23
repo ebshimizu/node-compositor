@@ -1043,7 +1043,7 @@ namespace Comp {
       out = (T)1;
 
     if (gamma < 1e-6)
-      gamma = 1e-6;   // clamp to small
+      gamma = (T)1e-6;   // clamp to small
 
     // gamma correction
     out = pow(out, 1 / gamma);

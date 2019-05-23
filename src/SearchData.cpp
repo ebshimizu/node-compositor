@@ -299,6 +299,8 @@ double ExpSearchSet::structDiff(shared_ptr<ExpSearchSample> x, shared_ptr<ExpSea
     //getLogger()->log("Average Structural Diff value: " + to_string(diff));
     return diff;
   }
+
+  return 1e10;
 }
 
 double ExpSearchSet::binStructPct(shared_ptr<ExpSearchSample> x)

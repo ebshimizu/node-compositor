@@ -667,7 +667,7 @@ namespace Comp {
           int i = xt + yt * width;
           int o = x + y * width;
 
-          if (i < 0 || i >= comp->numPx())
+          if (i < 0 || (unsigned int)i >= comp->numPx())
             continue;
 
           // pixel data is a flat array, rgba interlaced format
@@ -2678,7 +2678,7 @@ namespace Comp {
     map<string, float> results;
 
     // TODO: make variable
-    float delta = 0.01;
+    float delta = 0.01f;
 
     // r is the current render context
     for (auto& p : currentVals) {
