@@ -2842,8 +2842,8 @@ void CompositorWrapper::pointImportance(const Nan::FunctionCallbackInfo<v8::Valu
     string mode(*i0);
 
     v8::Local<v8::Object> region = info[1].As<v8::Object>();
-    int x = Nan::Get(region, Nan::New("x").ToLocalChecked()).ToLocalChecked()->Int32Value();
-    int y = Nan::Get(region, Nan::New("y").ToLocalChecked()).ToLocalChecked()->Int32Value();
+    int x = Nan::To<int>(Nan::Get(region, Nan::New("x").ToLocalChecked()).ToLocalChecked()).ToChecked();
+    int y = Nan::To<int>(Nan::Get(region, Nan::New("y").ToLocalChecked()).ToLocalChecked()).ToChecked();
 
     Nan::MaybeLocal<v8::Object> maybe2 = Nan::To<v8::Object>(info[2]);
     if (maybe2.IsEmpty()) {
@@ -3355,7 +3355,7 @@ void CompositorWrapper::addGroupEffect(const Nan::FunctionCallbackInfo<v8::Value
         Nan::ThrowError("Stroke effect needs a color");
       }
 
-      effect._width = Nan::Get(obj, Nan::New("width").ToLocalChecked()).ToLocalChecked()->IntegerValue();
+      effect._width = Nan::To<int>(Nan::Get(obj, Nan::New("width").ToLocalChecked()).ToLocalChecked()).ToChecked();
 
       auto rgb = Nan::Get(obj, Nan::New("color").ToLocalChecked()).ToLocalChecked().As<v8::Object>();
       effect._color._r = (float)Nan::To<double>(Nan::Get(rgb, Nan::New("r").ToLocalChecked()).ToLocalChecked()).ToChecked();
@@ -4283,34 +4283,34 @@ void ModelWrapper::schemaSample(const Nan::FunctionCallbackInfo<v8::Value>& info
       string propName(*prop);
 
       if (propName == "mode") {
-        constraint._mode = (Comp::AxisConstraintMode)co->Get(Nan::Get(keys, j).ToLocalChecked())->Int32Value();
+        constraint._mode = (Comp::AxisConstraintMode)Nan::To<int>(Nan::Get(co, Nan::Get(keys, j).ToLocalChecked()).ToLocalChecked()).ToChecked();
       }
       else if (propName == "axis") {
-        Nan::Utf8String val(co->Get(Nan::Get(keys, j).ToLocalChecked()));
+        Nan::Utf8String val(Nan::Get(co, Nan::Get(keys, j).ToLocalChecked()).ToLocalChecked());
         constraint._axis = string(*val);
       }
       else if (propName == "min") {
-        constraint._min = (float)co->Get(Nan::Get(keys, j).ToLocalChecked())->NumberValue();
+        constraint._min = (float)Nan::To<double>(Nan::Get(co, Nan::Get(keys, j).ToLocalChecked()).ToLocalChecked()).ToChecked();
       }
       else if (propName == "max") {
-        constraint._max = (float)co->Get(Nan::Get(keys, j).ToLocalChecked())->NumberValue();
+        constraint._max = (float)Nan::To<double>(Nan::Get(co, Nan::Get(keys, j).ToLocalChecked()).ToLocalChecked()).ToChecked();
       }
       else if (propName == "layer") {
-        Nan::Utf8String val(co->Get(Nan::Get(keys, j).ToLocalChecked()));
+        Nan::Utf8String val(Nan::Get(co, Nan::Get(keys, j).ToLocalChecked()).ToLocalChecked());
         constraint._layer = string(*val);
       }
       else if (propName == "type") {
-        constraint._type = (Comp::AdjustmentType)co->Get(Nan::Get(keys, j).ToLocalChecked())->Int32Value();
+        constraint._type = (Comp::AdjustmentType)Nan::To<int>(Nan::Get(co, Nan::Get(keys, j).ToLocalChecked()).ToLocalChecked()).ToChecked();;
       }
       else if (propName == "param") {
-        Nan::Utf8String val(co->Get(Nan::Get(keys, j).ToLocalChecked()));
+        Nan::Utf8String val(Nan::Get(co, Nan::Get(keys, j).ToLocalChecked()).ToLocalChecked());
         constraint._param = string(*val);
       }
       else if (propName == "val") {
-        constraint._val = (float)co->Get(Nan::Get(keys, j).ToLocalChecked())->NumberValue();
+        constraint._val = (float)Nan::To<double>(Nan::Get(co, Nan::Get(keys, j).ToLocalChecked()).ToLocalChecked()).ToChecked();
       }
       else if (propName == "tolerance") {
-        constraint._tolerance = (float)co->Get(Nan::Get(keys, j).ToLocalChecked())->NumberValue();
+        constraint._tolerance = (float)Nan::To<double>(Nan::Get(co, Nan::Get(keys, j).ToLocalChecked()).ToLocalChecked()).ToChecked();
       }
     }
 
@@ -4403,7 +4403,7 @@ void ModelWrapper::addSlider(const Nan::FunctionCallbackInfo<v8::Value>& info)
       }
 
       if (Nan::HasOwnProperty(objData, Nan::New("adjustmentType").ToLocalChecked()).ToChecked()) {
-        param._type = (Comp::AdjustmentType)(Nan::Get(objData, Nan::New("adjustmentType").ToLocalChecked()).ToLocalChecked()->Int32Value());
+        param._type = (Comp::AdjustmentType)Nan::To<int>(Nan::Get(objData, Nan::New("adjustmentType").ToLocalChecked()).ToLocalChecked()).ToChecked();
       }
       else {
         Nan::ThrowError("Parameter objects must have an adjustmentType field");
@@ -4425,10 +4425,10 @@ void ModelWrapper::addSlider(const Nan::FunctionCallbackInfo<v8::Value>& info)
         funcs.push_back(func);
       }
       else if (funcType == "sawtooth") {
-        int cycles = excGet(objData, "cycles")->Int32Value();
+        int cycles = Nan::To<int>(excGet(objData, "cycles")).ToChecked();
         float min = (float)Nan::To<double>(excGet(objData, "min")).ToChecked();
         float max = (float)Nan::To<double>(excGet(objData, "max")).ToChecked();
-        bool inverted = excGet(objData, "inverted")->BooleanValue();
+        bool inverted = Nan::To<bool>(excGet(objData, "inverted")).ToChecked();
 
         shared_ptr<Comp::ParamFunction> func = shared_ptr<Comp::ParamFunction>(new Comp::Sawtooth(cycles, min, max, inverted));
         funcs.push_back(func);
@@ -4441,8 +4441,8 @@ void ModelWrapper::addSlider(const Nan::FunctionCallbackInfo<v8::Value>& info)
         auto ya = excGet(objData, "ys").As<v8::Array>();
 
         for (unsigned int i = 0; i < xa->Length(); i++) {
-          xs.push_back(Nan::Get(xa, i).ToLocalChecked()->NumberValue());
-          ys.push_back(Nan::Get(ya, i).ToLocalChecked()->NumberValue());
+          xs.push_back(Nan::To<double>(Nan::Get(xa, i).ToLocalChecked()).ToChecked());
+          ys.push_back(Nan::To<double>(Nan::Get(ya, i).ToLocalChecked()).ToChecked());
         }
 
         shared_ptr<Comp::ParamFunction> func = shared_ptr<Comp::ParamFunction>(new Comp::LinearInterp(xs, ys));
@@ -4615,11 +4615,11 @@ void UISliderWrapper::New(const Nan::FunctionCallbackInfo<v8::Value>& info)
     v8::Local<v8::Object> obj = info[0].As<v8::Object>();
     Nan::Utf8String l(Nan::Get(obj, Nan::New("layer").ToLocalChecked()).ToLocalChecked());
     Nan::Utf8String p(Nan::Get(obj, Nan::New("param").ToLocalChecked()).ToLocalChecked());
-    Comp::AdjustmentType t = (Comp::AdjustmentType)Nan::Get(obj, Nan::New("type").ToLocalChecked()).ToLocalChecked()->Int32Value();
+    Comp::AdjustmentType t = (Comp::AdjustmentType)Nan::To<int>(Nan::Get(obj, Nan::New("type").ToLocalChecked()).ToLocalChecked()).ToChecked();
     Nan::Utf8String dn(Nan::Get(obj, Nan::New("displayName").ToLocalChecked()).ToLocalChecked());
 
     Comp::UISlider* i = new Comp::UISlider(string(*l), string(*p), t, string(*dn));
-    i->setVal(Nan::Get(obj, Nan::New("value").ToLocalChecked()).ToLocalChecked()->NumberValue());
+    i->setVal(Nan::To<double>(Nan::Get(obj, Nan::New("value").ToLocalChecked()).ToLocalChecked()).ToChecked());
 
     UISliderWrapper* sw = new UISliderWrapper(i);
     sw->Wrap(info.This());
@@ -4787,11 +4787,11 @@ void UIMetaSliderWrapper::New(const Nan::FunctionCallbackInfo<v8::Value>& info)
     v8::Local<v8::Object> sliders = Nan::Get(obj, Nan::New("subSliders").ToLocalChecked()).ToLocalChecked().As<v8::Object>();
     auto ids = Nan::GetOwnPropertyNames(sliders).ToLocalChecked();
     for (unsigned int i = 0; i < ids->Length(); i++) {
-      auto sliderObj = sliders->Get(Nan::Get(ids, i).ToLocalChecked()).As<v8::Object>();
+      auto sliderObj = Nan::Get(sliders, Nan::Get(ids, i).ToLocalChecked()).ToLocalChecked().As<v8::Object>();
 
       Nan::Utf8String layer(Nan::Get(sliderObj, Nan::New("layer").ToLocalChecked()).ToLocalChecked());
       Nan::Utf8String param(Nan::Get(sliderObj, Nan::New("param").ToLocalChecked()).ToLocalChecked());
-      Comp::AdjustmentType t = (Comp::AdjustmentType)Nan::Get(sliderObj, Nan::New("type").ToLocalChecked()).ToLocalChecked()->Int32Value();
+      Comp::AdjustmentType t = (Comp::AdjustmentType)Nan::To<int>(Nan::Get(sliderObj, Nan::New("type").ToLocalChecked()).ToLocalChecked()).ToChecked();
 
       vector<float> xs;
       vector<float> ys;
@@ -4799,8 +4799,8 @@ void UIMetaSliderWrapper::New(const Nan::FunctionCallbackInfo<v8::Value>& info)
       auto ysa = Nan::Get(sliderObj, Nan::New("ys").ToLocalChecked()).ToLocalChecked().As<v8::Array>();
 
       for (unsigned int i = 0; i < xsa->Length(); i++) {
-        xs.push_back(Nan::Get(xsa, i).ToLocalChecked()->NumberValue());
-        ys.push_back(Nan::Get(ysa, i).ToLocalChecked()->NumberValue());
+        xs.push_back(Nan::To<double>(Nan::Get(xsa, i).ToLocalChecked()).ToChecked());
+        ys.push_back(Nan::To<double>(Nan::Get(ysa, i).ToLocalChecked()).ToChecked());
       }
 
       slider->addSlider(string(*layer), string(*param), t, xs, ys);
@@ -4843,8 +4843,8 @@ void UIMetaSliderWrapper::addSlider(const Nan::FunctionCallbackInfo<v8::Value>& 
       }
 
       for (unsigned int i = 0; i < xsr->Length(); i++) {
-        xs.push_back(Nan::Get(xsr, i).ToLocalChecked()->NumberValue());
-        ys.push_back(Nan::Get(ysr, i).ToLocalChecked()->NumberValue());
+        xs.push_back(Nan::To<double>(Nan::Get(xsr, i).ToLocalChecked()).ToChecked());
+        ys.push_back(Nan::To<double>(Nan::Get(ysr, i).ToLocalChecked()).ToChecked());
       }
 
       string sliderName = s->_mSlider->addSlider(layer, param, t, xs, ys);
@@ -5137,7 +5137,7 @@ void UISamplerWrapper::New(const Nan::FunctionCallbackInfo<v8::Value>& info)
     v8::Local<v8::Object> obj = info[0].As<v8::Object>();
 
     Nan::Utf8String dn(Nan::Get(obj, Nan::New("displayName").ToLocalChecked()).ToLocalChecked());
-    Comp::AxisEvalFuncType type = (Comp::AxisEvalFuncType)Nan::Get(obj, Nan::New("objEvalMode").ToLocalChecked()).ToLocalChecked()->Int32Value();
+    Comp::AxisEvalFuncType type = (Comp::AxisEvalFuncType)Nan::To<int>(Nan::Get(obj, Nan::New("objEvalMode").ToLocalChecked()).ToLocalChecked()).ToChecked();
 
     Comp::UISampler* sampler = new Comp::UISampler(string(*dn));
     sampler->setObjectiveMode(type);
@@ -5151,7 +5151,7 @@ void UISamplerWrapper::New(const Nan::FunctionCallbackInfo<v8::Value>& info)
 
       Nan::Utf8String layer(Nan::Get(p, Nan::New("layer").ToLocalChecked()).ToLocalChecked());
       Nan::Utf8String param(Nan::Get(p, Nan::New("param").ToLocalChecked()).ToLocalChecked());
-      Comp::AdjustmentType t = (Comp::AdjustmentType)Nan::Get(p, Nan::New("type").ToLocalChecked()).ToLocalChecked()->Int32Value();
+      Comp::AdjustmentType t = (Comp::AdjustmentType)Nan::To<int>(Nan::Get(p, Nan::New("type").ToLocalChecked()).ToLocalChecked()).ToChecked();
 
       inf._name = string(*layer);
       inf._param = string(*param);
