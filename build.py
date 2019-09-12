@@ -6,7 +6,7 @@ import shutil
 
 def build():
 	try:
-		opts, args = getopt.getopt(sys.argv[1:], "cdnr", ['configure','debug','node-only','rebuild', 'move-debug-dir'])
+		opts, args = getopt.getopt(sys.argv[1:], "cdnrv:", ['configure','debug','node-only','rebuild', 'move-debug-dir','version'])
 	except getopt.GetoptError as err:
 		print str(err)
 		sys.exit(-1)
@@ -28,6 +28,8 @@ def build():
 	# move debug dir
 	moveDebugDir = False
 
+	version = "5.0.10"
+
 	for o, a in opts:
 		if o in ("-c", "--configure"):
 			configure = True
@@ -39,6 +41,8 @@ def build():
 			rebuild = True
 		elif o in ("--move-debug-dir"):
 			moveDebugDir = True
+		elif o in ("-v", "--version"):
+			version = a
 
 	if (configure):
 		# run configuration
@@ -57,7 +61,7 @@ def build():
 
 		if (withElectron):
 			#cmd = cmd + " --target=1.8.4 --arch=x64 --dist-url=https://atom.io/download/electron"
-			cmd = cmd + " --target=5.0.1 --arch=x64 --dist-url=https://atom.io/download/electron"
+			cmd = cmd + " --target=" + version + " --arch=x64 --dist-url=https://atom.io/download/electron"
 
 		print(cmd)
 		os.system(cmd)
