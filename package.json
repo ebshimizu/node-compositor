@@ -9,7 +9,7 @@
     "node-gyp": "^4.0.0"
   },
   "scripts": {
-    "preinstall": "git submodule update --recursive"
+    "preinstall": "git submodule update --init --recursive"
   },
   "gypfile": true
 }
