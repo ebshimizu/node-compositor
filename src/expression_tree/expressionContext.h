@@ -52,7 +52,7 @@ struct ExpContext
 		resultCount = max(resultCount, resultIndex + 1);
 	}
 
-	ExpStep addStep(ExpStepData &step)
+	ExpStep addStep(ExpStepData step)
 	{
 		step.stepIndex = (int)steps.size();
 		steps.push_back(step);
